@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <div class="d-flex flex-column flex-md-row align-items-center justify-content-between">
+            <h5 class="m-0 font-weight-bold text-primary mb-2 mb-md-0">
+                <i class="fas fa-layer-group me-2"></i>Team Management
+            </h5>
+            
+            <a href="{% url 'team_add' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus me-1"></i> Create New Team
+            </a>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="teamsTable" width="100%" cellspacing="0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 5%">ID</th>
+                        <th style="width: 20%">Team Name</th>
+                        <th style="width: 25%">Description</th>
+                        <th style="width: 10%" class="text-center">Member Count</th>
+                        
+                        <th style="width: 25%" class="no-export">Members (Preview)</th>
+                        
+                        <th style="width: 15%">Created At</th>
+
+                        <th class="d-none">Members List (Text)</th>
+
+                        <th style="width: 10%" class="text-center no-export">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in teams %}
+                    <tr>
+                        <td>{{ team.id }}</td>
+                        <td class="fw-bold text-primary">{{ team.name }}</td>
+                        <td>{{ team.description|default:"-"|truncatewords:10 }}</td>
+                        
+                        <td class="text-center">
+                            <span class="badge bg-secondary rounded-pill">{{ team.members.count }}</span>
+                        </td>
+
+                        <td>
+                            <div class="d-flex -space-x-2 overflow-hidden">
+                                {% for member in team.members.all|slice:":5" %}
+                                    <div class="avatar rounded-circle bg-light border border-white d-flex justify-content-center align-items-center text-primary fw-bold" 
+                                         style="width:30px; height:30px; font-size:10px; margin-right: -8px;"
+                                         data-bs-toggle="tooltip" title="{{ member.first_name }} {{ member.last_name }}">
+                                        {{ member.first_name|slice:":1" }}{{ member.last_name|slice:":1" }}
+                                    </div>
+                                {% endfor %}
+                                {% if team.members.count > 5 %}
+                                    <div class="avatar rounded-circle bg-secondary text-white border border-white d-flex justify-content-center align-items-center" 
+                                         style="width:30px; height:30px; font-size:10px; z-index: 10;">
+                                        +{{ team.members.count|add:"-5" }}
+                                    </div>
+                                {% endif %}
+                                {% if team.members.count == 0 %}
+                                    <span class="text-muted small fst-italic">No members</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td>{{ team.created_at|date:"d M Y" }}</td>
+
+                        <td class="d-none">
+                            {% for member in team.members.all %}
+                                {{ member.first_name }} {{ member.last_name }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </td>
+
+                        <td class="text-center">
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'team_edit' team.pk %}" class="btn btn-outline-primary btn-sm" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'team_delete' team.pk %}" class="btn btn-outline-danger btn-sm" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        $('#teamsTable').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    extend: 'excelHtml5',
+                    text: '<i class="fas fa-file-excel"></i> Excel',
+                    className: 'btn btn-success btn-sm',
+                    title: 'CH-Response Team List',
+                    // no-export sınıfı olmayanları al (Gizli "Members List" sütununu alır, Avatarları almaz)
+                    exportOptions: { columns: ':not(.no-export)' }
+                },
+                {
+                    extend: 'pdfHtml5',
+                    text: '<i class="fas fa-file-pdf"></i> PDF',
+                    className: 'btn btn-danger btn-sm',
+                    title: 'CH-Response Team List',
+                    exportOptions: { columns: ':not(.no-export)' },
+                    customize: function (doc) {
+                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1).join('*').split('');
+                    }
+                },
+                {
+                    extend: 'print',
+                    text: '<i class="fas fa-print"></i> Print',
+                    className: 'btn btn-dark btn-sm',
+                    exportOptions: { columns: ':visible:not(.no-export)' }
+                }
+            ],
+            pageLength: 25,
+            order: [[0, 'desc']], // ID'ye göre tersten sırala
+            // Gizli sütunları (Index 6: Members List Text) DataTables'a bildir
+            columnDefs: [
+                { targets: [6], visible: false } 
+            ]
+        });
+    });
+</script>
+{% endblock %}

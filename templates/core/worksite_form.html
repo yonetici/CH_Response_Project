@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Worksite Name</label>
+                        {{ form.name }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Sector (Auto-detects from map)</label>
+                        {{ form.sector }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        {{ form.description }}
+                    </div>
+                    
+                    {{ form.location_data }} <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Save Worksite</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div>
+                    <strong><i class="fas fa-map-marked-alt"></i> Draw Worksite Location</strong>
+                    <small class="text-muted ms-2">(Pin point or draw area)</small>
+                </div>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="toggleSectors" checked>
+                    <label class="form-check-label small fw-bold" for="toggleSectors">Show Sectors</label>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="map" class="map-container" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ sectors_json|json_script:"sectors-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 1. Verileri Al
+    var allSectors = JSON.parse(document.getElementById('sectors-data').textContent);
+    var locationInput = document.getElementById('id_location_data');
+    var sectorSelect = $('#id_sector');
+
+    // 2. Haritayı Başlat
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
+
+    var map = L.map('map', {
+        center: [40.1885, 29.0610],
+        zoom: 12,
+        layers: [osm]
+    });
+
+    L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
+
+    // 3. Çizim Katmanı (Worksite İçin)
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    // 4. Sektör Katmanı (Referans İçin)
+    var sectorLayerGroup = L.layerGroup().addTo(map); // Başlangıçta ekli
+
+    // Sektörleri Çiz
+    if (allSectors) {
+        allSectors.forEach(function(s) {
+            if (s.geometry) {
+                // interactive: false yaparak tıklamaların (click-through) haritaya geçmesini sağlıyoruz.
+                // Böylece sektörün üzerine yeni çizim yapabilirsiniz.
+                L.geoJSON(s.geometry, {
+                    interactive: false, 
+                    style: { color: s.color, weight: 2, fillOpacity: 0.15 }
+                }).addTo(sectorLayerGroup);
+            }
+        });
+    }
+
+    // 5. Toggle Mantığı
+    document.getElementById('toggleSectors').addEventListener('change', function() {
+        if (this.checked) {
+            map.addLayer(sectorLayerGroup);
+        } else {
+            map.removeLayer(sectorLayerGroup);
+        }
+    });
+
+    // 6. Mevcut Worksite Verisi Varsa Yükle (Edit Mode)
+    if (locationInput.value) {
+        try {
+            var geom = JSON.parse(locationInput.value);
+            // GeoJSON -> Leaflet Layer dönüşümü
+            var layer = L.GeoJSON.geometryToLayer(geom);
+            
+            // Stil ayarları (Polygon ise)
+            if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+                layer.setStyle({ color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2 });
+            }
+            
+            drawnItems.addLayer(layer);
+            map.fitBounds(drawnItems.getBounds(), { maxZoom: 16 });
+        } catch(e) { console.error("GeoJSON Parse Error:", e); }
+    }
+
+    // 7. Çizim Kontrolleri (Polygon ve Marker Aktif)
+    var drawControl = new L.Control.Draw({
+        draw: {
+            polyline: false, 
+            circle: false, 
+            circlemarker: false,
+            polygon: true,   // Polygon Açık
+            rectangle: true, // Rectangle Açık
+            marker: true     // Marker Açık
+        },
+        edit: {
+            featureGroup: drawnItems, // Düzenleme modu
+            remove: true
+        }
+    });
+    map.addControl(drawControl);
+
+    // 8. ÇİZİM OLAYLARI (Created)
+    map.on(L.Draw.Event.CREATED, function (e) {
+        drawnItems.clearLayers(); // Sadece 1 şekil çizilebilir, eskisin sil
+        var layer = e.layer;
+        drawnItems.addLayer(layer);
+        
+        // A) Geometriyi Inputa Kaydet
+        var geometry = layer.toGeoJSON().geometry;
+        locationInput.value = JSON.stringify(geometry);
+
+        // B) Otomatik Sektör Bulma (Turf.js)
+        detectSector(geometry);
+    });
+
+    // Düzenleme Olayları
+    map.on(L.Draw.Event.EDITED, function (e) {
+        var layers = e.layers;
+        layers.eachLayer(function (layer) {
+            var geometry = layer.toGeoJSON().geometry;
+            locationInput.value = JSON.stringify(geometry);
+            detectSector(geometry);
+        });
+    });
+
+    // --- YARDIMCI FONKSİYON: SEKTÖR ALGILAMA ---
+    function detectSector(geometry) {
+        var pointToCheck;
+
+        // Eğer çizilen şey NOKTA ise kendisini al
+        if (geometry.type === 'Point') {
+            pointToCheck = turf.point(geometry.coordinates);
+        } 
+        // Eğer çizilen şey POLYGON ise MERKEZİNİ (Centroid) al
+        else {
+            pointToCheck = turf.centroid(geometry);
+        }
+
+        var foundSectorId = null;
+
+        if (allSectors) {
+            allSectors.forEach(function(s) {
+                if (s.geometry) {
+                    var sectorPolygon = turf.polygon(s.geometry.coordinates);
+                    
+                    // Nokta (veya merkez) sektörün içinde mi?
+                    if (turf.booleanPointInPolygon(pointToCheck, sectorPolygon)) {
+                        foundSectorId = s.id;
+                        
+                        // Kullanıcıya bilgi ver
+                        var popupContent = '<div class="text-center"><i class="fas fa-check-circle text-success"></i><br>Assigned to Sector:<br><b>' + s.name + '</b></div>';
+                        
+                        // Popup'ı şeklin ortasında aç
+                        var latlng = [pointToCheck.geometry.coordinates[1], pointToCheck.geometry.coordinates[0]];
+                        L.popup().setLatLng(latlng).setContent(popupContent).openOn(map);
+                    }
+                }
+            });
+        }
+
+        // Selectbox güncelle
+        if (foundSectorId) {
+            sectorSelect.val(foundSectorId).trigger('change');
+        } else {
+             // Sektör bulunamadıysa (boş alan)
+             // L.popup().setLatLng(...).setContent('No Sector Found').openOn(map);
+        }
+    }
+
+    // Select2 Init
+    $('.select2-sector').select2({ theme: 'bootstrap-5', width: '100%' });
+</script>
+{% endblock %}

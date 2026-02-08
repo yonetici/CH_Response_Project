@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-map-marker-alt me-2"></i>Worksite Management</h1>
+    <a href="{% url 'worksite_add' %}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus me-1"></i> New Worksite
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body p-0">
+        <div id="worksiteMap" style="height: 400px; width: 100%;"></div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">Worksite List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="worksiteTable" width="100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Worksite Name</th>
+                        <th>Assigned Sector</th>
+                        <th>Description</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ws in worksites %}
+                    <tr>
+                        <td>{{ ws.id }}</td>
+                        <td class="fw-bold">{{ ws.name }}</td>
+                        <td>
+                            {% if ws.sector %}
+                                <span class="badge" 
+                                      style="--sec-color: {{ ws.sector.color }}; background-color: var(--sec-color); color: #fff; text-shadow: 1px 1px 1px #000;">
+                                    {{ ws.sector.name }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ws.description|default:"-" }}</td>
+                        <td>{{ ws.created_at|date:"d M Y" }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'worksite_edit' ws.pk %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-edit"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{ map_data|json_script:"map-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var mapData = JSON.parse(document.getElementById('map-data').textContent);
+    
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
+
+    var map = L.map('worksiteMap', {
+        center: [40.1885, 29.0610],
+        zoom: 12,
+        layers: [osm]
+    });
+
+    L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
+
+    // 1. Sektörleri Çiz (Arka Plan)
+    if (mapData.sectors) {
+        mapData.sectors.forEach(function(s) {
+            if (s.geometry) {
+                L.geoJSON(s.geometry, {
+                    style: { color: s.color, weight: 1, fillOpacity: 0.1 }, 
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup("Sector: " + s.name);
+                    }
+                }).addTo(map);
+            }
+        });
+    }
+
+    // 2. Worksite'ları Çiz (Marker VEYA Polygon)
+    var worksiteLayerGroup = L.featureGroup().addTo(map);
+
+    if (mapData.worksites) {
+        mapData.worksites.forEach(function(w) {
+            if (w.geometry) {
+                // Marker veya Polygon fark etmeksizin GeoJSON olarak ekle
+                L.geoJSON(w.geometry, {
+                    style: { color: '#dc3545', weight: 3, opacity: 0.8, fillOpacity: 0.4 }, // Worksite Rengi (Kırmızı ton)
+                    pointToLayer: function (feature, latlng) {
+                        // Eğer nokta ise Marker kullan
+                        return L.marker(latlng);
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup("<b>Worksite:</b> " + w.name + "<br>Sector: " + w.sector_name);
+                    }
+                }).addTo(worksiteLayerGroup);
+            }
+        });
+        
+        // Haritayı verilere odakla
+        if (worksiteLayerGroup.getLayers().length > 0) {
+            map.fitBounds(worksiteLayerGroup.getBounds(), { padding: [50, 50] });
+        }
+    }
+
+    $(document).ready(function() {
+        $('#worksiteTable').DataTable({ dom: 'Bfrtip', buttons: ['excel', 'pdf', 'print'] });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row h-100">
+    <div class="col-lg-8 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-satellite me-2"></i>Operational Map</h5>
+                
+                <div class="d-flex gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="toggleSectors" checked>
+                        <label class="form-check-label small text-white-50" for="toggleSectors">Sectors</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="toggleWorksites" checked>
+                        <label class="form-check-label small text-white-50" for="toggleWorksites">Worksites</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="opMap" style="height: 600px; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow border-left-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="fw-bold">1. Select Team</label>
+                        {{ form.team }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="fw-bold">2. Select Worksite</label>
+                        <div class="small text-muted mb-1">(Click on map to auto-select)</div>
+                        {{ form.worksite }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label>Start Time</label>
+                            {{ form.start_time }}
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label>End Time</label>
+                            {{ form.end_time }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Status</label>
+                        {{ form.status }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Notes</label>
+                        {{ form.notes }}
+                    </div>
+
+<div class="d-grid gap-2">
+    <button type="submit" class="btn btn-success btn-lg">
+        <i class="fas fa-check-circle me-1"></i> Save Assignment
+    </button>
+    
+    {% if form.instance.pk %}
+    <a href="{% url 'field_dashboard' form.instance.pk %}" class="btn btn-warning btn-lg text-dark">
+        <i class="fas fa-clipboard-list me-1"></i> Go to Field Forms
+    </a>
+    {% endif %}
+
+    <a href="{% url 'assignment_list' %}" class="btn btn-secondary">Cancel</a>
+</div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-3 shadow-sm">
+            <i class="fas fa-info-circle me-1"></i>
+            Click on a <strong>Worksite (Red)</strong> on the map to see active teams and assignment history.
+        </div>
+    </div>
+</div>
+
+{{ map_data|json_script:"map-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var mapData = JSON.parse(document.getElementById('map-data').textContent);
+    var worksiteSelect = $('.select2-worksite');
+
+    // 1. KATMANLAR (Uydu & Sokak)
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
+
+    // 2. HARİTA BAŞLAT
+    var map = L.map('opMap', {
+        center: [40.1885, 29.0610],
+        zoom: 12,
+        layers: [osm]
+    });
+
+    L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
+
+    // 3. SEKTÖRLER (Mavi Poligonlar)
+    var sectorLayerGroup = L.layerGroup().addTo(map);
+    if (mapData.sectors) {
+        mapData.sectors.forEach(function(s) {
+            if (s.geometry) {
+                L.geoJSON(s.geometry, {
+                    style: { color: s.color, weight: 2, fillOpacity: 0.15 },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindTooltip(s.name, {permanent: false, direction: "center"});
+                    }
+                }).addTo(sectorLayerGroup);
+            }
+        });
+    }
+
+    // 4. WORKSITES (Kırmızı - Marker veya Polygon)
+    var worksiteLayerGroup = L.featureGroup().addTo(map);
+    
+    if (mapData.worksites) {
+        mapData.worksites.forEach(function(w) {
+            if (w.geometry) {
+                // POPUP İÇERİĞİ OLUŞTUR (HTML)
+                var popupContent = '<div style="min-width: 200px;">';
+                popupContent += '<h6 class="fw-bold text-primary mb-1">' + w.name + '</h6>';
+                popupContent += '<span class="badge bg-secondary mb-2">' + w.sector_name + '</span>';
+                
+                // Aktif Ekipler
+                popupContent += '<div class="mb-2"><strong><i class="fas fa-running text-success"></i> Active Teams:</strong>';
+                if (w.active_teams.length > 0) {
+                    popupContent += '<ul class="ps-3 mb-0 small">';
+                    w.active_teams.forEach(t => {
+                        popupContent += '<li>' + t.team + ' <span class="text-muted">(' + t.start + ')</span></li>';
+                    });
+                    popupContent += '</ul>';
+                } else {
+                    popupContent += '<div class="small text-muted fst-italic ms-2">No active teams.</div>';
+                }
+                popupContent += '</div>';
+
+                // Geçmiş
+                popupContent += '<div class="border-top pt-1"><strong><i class="fas fa-history text-secondary"></i> History:</strong>';
+                if (w.history_teams.length > 0) {
+                    popupContent += '<div style="max-height: 100px; overflow-y: auto;"><ul class="ps-3 mb-0 small text-muted">';
+                    w.history_teams.forEach(t => {
+                        popupContent += '<li>' + t.team + '</li>';
+                    });
+                    popupContent += '</ul></div>';
+                } else {
+                    popupContent += '<div class="small text-muted fst-italic ms-2">No history.</div>';
+                }
+                popupContent += '</div></div>';
+
+                // HARİTAYA EKLE
+                var layer = L.geoJSON(w.geometry, {
+                    style: { color: '#dc3545', weight: 2, opacity: 0.9, fillOpacity: 0.5 },
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 8, fillColor: "#dc3545", color: "#fff", weight: 2, fillOpacity: 0.8
+                        });
+                    }
+                }).addTo(worksiteLayerGroup);
+
+                // TIKLAMA OLAYI
+                layer.bindPopup(popupContent);
+                layer.on('click', function() {
+                    // 1. Selectbox'ı güncelle
+                    worksiteSelect.val(w.id).trigger('change');
+                    // 2. Form alanını vurgula (Görsel efekt)
+                    $('.select2-selection--single').addClass('border-primary shadow-sm');
+                    setTimeout(() => { $('.select2-selection--single').removeClass('border-primary shadow-sm'); }, 1000);
+                });
+            }
+        });
+    }
+
+    // 5. TOGGLE MANTIĞI
+    document.getElementById('toggleSectors').addEventListener('change', function() {
+        this.checked ? map.addLayer(sectorLayerGroup) : map.removeLayer(sectorLayerGroup);
+    });
+    document.getElementById('toggleWorksites').addEventListener('change', function() {
+        this.checked ? map.addLayer(worksiteLayerGroup) : map.removeLayer(worksiteLayerGroup);
+    });
+
+    // 6. SELECT2 Başlat
+    $('.select2-team').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select Team' });
+    $('.select2-worksite').select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select Worksite' });
+
+    // Sayfa açıldığında worksite'lara odaklan
+    if (worksiteLayerGroup.getLayers().length > 0) {
+        map.fitBounds(worksiteLayerGroup.getBounds(), {padding: [50,50]});
+    }
+</script>
+{% endblock %}

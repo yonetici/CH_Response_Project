@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm mb-5">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0"><i class="fas fa-user-edit me-2"></i>{{ title|default:"Personnel Form" }}</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong><i class="fas fa-exclamation-triangle me-2"></i>Please correct the errors below:</strong>
+                            <ul class="mb-0 mt-2">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ field|title }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-id-card me-2"></i>Identity Information</h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">First Name</label>
+                            {{ form.first_name }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Last Name</label>
+                            {{ form.last_name }}
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">SQ Number / Type</label>
+                            {{ form.sq_number }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Gender</label>
+                            {{ form.gender }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Country</label>
+                            {{ form.country }}
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-briefcase me-2"></i>Professional Details</h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Institution</label>
+                            {{ form.institution }}
+                            <div class="form-text text-muted">Select from list or type a new one.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Job Titles</label>
+                            {{ form.job_titles }}
+                            <div class="form-text text-muted">Select multiple or type new ones.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Main Expertise</label>
+                            {{ form.primary_expertise }}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Professional Profile</label>
+                            {{ form.professional_profile }}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Specific Expertise Details</label>
+                            {{ form.specific_expertise_details }}
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-address-book me-2"></i>Contact & Admin</h6>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Email</label>
+                            {{ form.email }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Mobile</label>
+                            {{ form.mobile }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Code for Insurance</label>
+                            {{ form.insurance_code }}
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-primary border-bottom pb-2 mb-3"><i class="fas fa-sticky-note me-2"></i>Notes</h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">General Notes</label>
+                            {{ form.notes }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-danger">Private Email/Notes (Admin Only)</label>
+                            {{ form.private_notes }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-5 pt-3 border-top">
+                        <a href="{% url 'personnel_list' %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg px-4">
+                            <i class="fas fa-save me-1"></i> Save Personnel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Institution alanı
+        $('.select2-institution').select2({
+            theme: 'bootstrap-5',
+            tags: true, 
+            allowClear: true,
+            placeholder: "Select or type new institution",
+            width: '100%'
+        });
+        
+        // Job Title alanı (Çoklu + Tagging)
+        $('.select2-job-title').select2({
+            theme: 'bootstrap-5',
+            tags: true, 
+            allowClear: true,
+            placeholder: "Select or type Job Titles",
+            width: '100%',
+            multiple: true
+        });
+
+        // Diğer Select Alanları (Search only)
+        $('#id_country, #id_gender, #id_primary_expertise, #id_sq_number').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            minimumResultsForSearch: 10 // Az seçenek varsa aramayı gizle
+        });
+    });
+</script>
+{% endblock %}

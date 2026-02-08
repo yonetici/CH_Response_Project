@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6 d-flex align-items-center">
+        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-draw-polygon me-2"></i>Sector Management</h1>
+        <a href="{% url 'sector_add' %}" class="btn btn-primary ms-3 btn-sm">
+            <i class="fas fa-plus me-1"></i> New Sector
+        </a>
+    </div>
+
+    <div class="col-md-6 d-flex justify-content-end align-items-center">
+        <div class="form-check form-switch p-2 bg-white border rounded shadow-sm">
+            <input class="form-check-input" type="checkbox" id="toggleWorksites">
+            <label class="form-check-label fw-bold small text-primary" for="toggleWorksites">
+                <i class="fas fa-map-marker-alt me-1"></i> Show Worksites on Map
+            </label>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body p-0">
+        <div id="sectorMap" style="height: 400px; width: 100%;"></div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">Sector List</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover" id="sectorTable" width="100%">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 5%">ID</th>
+                        <th style="width: 25%">Name</th>
+                        <th style="width: 30%">Description</th>
+                        <th style="width: 10%">Color</th>
+                        <th style="width: 15%">Created At</th>
+                        <th style="width: 15%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sector in sectors %}
+                    <tr>
+                        <td>{{ sector.id }}</td>
+                        <td class="fw-bold">{{ sector.name }}</td>
+                        <td>{{ sector.description|default:"-"|truncatewords:8 }}</td>
+                        <td>
+                            <span class="badge rounded-pill border" 
+                                  style="--bg-color: {{ sector.color }}; background-color: var(--bg-color); color: #fff; text-shadow: 1px 1px 1px #000;">
+                                {{ sector.color }}
+                            </span>
+                        </td>
+                        <td>{{ sector.created_at|date:"d M Y" }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'sector_edit' sector.pk %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-edit"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{ map_data|json_script:"map-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 1. Veriyi Güvenli Şekilde Al
+    var mapData = JSON.parse(document.getElementById('map-data').textContent);
+    
+    // 2. Haritayı Başlat
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
+
+    var map = L.map('sectorMap', {
+        center: [40.1885, 29.0610],
+        zoom: 11,
+        layers: [osm]
+    });
+
+    L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
+
+    // 3. Layer Grupları
+    var sectorLayerGroup = L.layerGroup().addTo(map); // Sektörler varsayılan olarak açık
+    var worksiteLayerGroup = L.featureGroup(); // Worksite'lar kapalı (Toggle ile açılacak)
+
+    // Otomatik Odaklanma İçin Bounds
+    var bounds = L.latLngBounds([]); 
+
+    // 4. Sektörleri Çiz
+    if (mapData.sectors && mapData.sectors.length > 0) {
+        mapData.sectors.forEach(function(s) {
+            if (s.geometry) {
+                var geoJson = L.geoJSON(s.geometry, {
+                    style: { color: s.color, weight: 2, fillOpacity: 0.3 },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup("<b>Sector:</b> " + s.name);
+                    }
+                }).addTo(sectorLayerGroup);
+                
+                // Bu sektörün sınırlarını genel sınırlara ekle
+                bounds.extend(geoJson.getBounds());
+            }
+        });
+        
+        // HARİTAYI ÇİZİMLERE ODAKLA
+        if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
+
+    // 5. Worksite'ları Hazırla (GÜNCELLENEN KISIM)
+    // Artık Point veya Polygon fark etmeksizin hepsini çizer
+    if (mapData.worksites) {
+        mapData.worksites.forEach(function(w) {
+            if (w.geometry) {
+                L.geoJSON(w.geometry, {
+                    // Worksite Stili (Kırmızı)
+                    style: { color: '#dc3545', weight: 2, opacity: 0.9, fillOpacity: 0.5 },
+                    
+                    // Eğer Nokta ise Marker'a çevir (Yoksa Polygon olarak çizer)
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: "#dc3545",
+                            color: "#000",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup("<b>Worksite:</b> " + w.name + "<br>Sector: " + w.sector_name);
+                    }
+                }).addTo(worksiteLayerGroup);
+            }
+        });
+    }
+
+    // 6. Toggle Mantığı
+    var toggle = document.getElementById('toggleWorksites');
+    if (toggle) {
+        toggle.addEventListener('change', function() {
+            if (this.checked) {
+                map.addLayer(worksiteLayerGroup);
+                
+                // İstersen worksite'ları açınca haritayı hepsini kapsayacak şekilde genişlet:
+                // if (worksiteLayerGroup.getLayers().length > 0) {
+                //    map.fitBounds(worksiteLayerGroup.getBounds());
+                // }
+            } else {
+                map.removeLayer(worksiteLayerGroup);
+            }
+        });
+    }
+
+    // 7. DataTables
+    $(document).ready(function() {
+        $('#sectorTable').DataTable({ dom: 'Bfrtip', buttons: ['excel', 'pdf', 'print'] });
+    });
+</script>
+{% endblock %}

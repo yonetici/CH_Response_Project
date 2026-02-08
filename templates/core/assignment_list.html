@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-satellite-dish me-2"></i>Operations Dashboard</h1>
+    <a href="{% url 'assignment_add' %}" class="btn btn-success shadow-sm">
+        <i class="fas fa-plus me-1"></i> Create New Assignment
+    </a>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold"><i class="fas fa-map me-2"></i>Live Field Map</h6>
+        
+        <div class="d-flex gap-3">
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="toggleSectors" checked>
+                <label class="form-check-label small text-white-50" for="toggleSectors">Show Sectors</label>
+            </div>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="toggleWorksites" checked>
+                <label class="form-check-label small text-white-50" for="toggleWorksites">Show Worksites</label>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div id="opsMap" style="height: 500px; width: 100%;"></div>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">Assignment Log</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle" id="opsTable" width="100%">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 10%">Status</th>
+                        <th style="width: 20%">Team</th>
+                        <th style="width: 25%">Worksite / Sector</th>
+                        <th style="width: 15%">Start Time</th>
+                        <th style="width: 15%">Duration</th>
+                        <th style="width: 15%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in assignments %}
+                    <tr>
+                        <td class="text-center">
+                            {% if a.status == 'ACTIVE' %}
+                                <span class="badge bg-success w-100 py-2"><i class="fas fa-sync fa-spin me-1"></i> ACTIVE</span>
+                            {% elif a.status == 'COMPLETED' %}
+                                <span class="badge bg-secondary w-100 py-2">COMPLETED</span>
+                            {% else %}
+                                <span class="badge bg-danger w-100 py-2">CANCELLED</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-dark">{{ a.team.name }}</td>
+                        <td>
+                            <div class="fw-bold">{{ a.worksite.name }}</div>
+                            <div class="small text-muted"><i class="fas fa-draw-polygon me-1"></i>{{ a.worksite.sector.name|default:"Unassigned" }}</div>
+                        </td>
+                        <td>
+                            <div class="small">{{ a.start_time|date:"Y-m-d" }}</div>
+                            <div class="fw-bold">{{ a.start_time|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            {% if a.end_time %}
+                                <span class="text-muted small">Finished<br>{{ a.end_time|timeuntil:a.start_time }}</span>
+                            {% else %}
+                                <span class="text-success fw-bold">{{ a.start_time|timesince }}</span>
+                            {% endif %}
+                        </td>
+<td class="text-center">
+    <div class="btn-group" role="group">
+        <a href="{% url 'assignment_edit' a.pk %}" class="btn btn-outline-primary btn-sm" title="Edit Assignment">
+            <i class="fas fa-edit"></i>
+        </a>
+        
+        <a href="{% url 'field_dashboard' a.pk %}" class="btn btn-warning btn-sm text-dark fw-bold" title="Open Field Dashboard">
+            <i class="fas fa-clipboard-list"></i> Forms
+        </a>
+    </div>
+</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{ map_data|json_script:"map-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 1. Veriyi Al
+    var mapData = JSON.parse(document.getElementById('map-data').textContent);
+
+    // 2. Harita Altlıkları (Uydu & Sokak)
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
+
+    // 3. Haritayı Başlat
+    var map = L.map('opsMap', {
+        center: [40.1885, 29.0610],
+        zoom: 12,
+        layers: [osm]
+    });
+
+    // Katman Kontrolü
+    L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
+
+    // 4. Katman Grupleri
+    var sectorLayerGroup = L.layerGroup().addTo(map);
+    var worksiteLayerGroup = L.featureGroup().addTo(map);
+
+    // --- SEKTÖRLERİ ÇİZ ---
+    if (mapData.sectors) {
+        mapData.sectors.forEach(function(s) {
+            if (s.geometry) {
+                L.geoJSON(s.geometry, {
+                    style: { color: s.color, weight: 2, fillOpacity: 0.15 },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindTooltip("Sector: " + s.name, {sticky: true});
+                    }
+                }).addTo(sectorLayerGroup);
+            }
+        });
+    }
+
+    // --- WORKSITE VE INFO WINDOW ---
+    if (mapData.worksites) {
+        mapData.worksites.forEach(function(w) {
+            if (w.geometry) {
+                
+                // POPUP (INFO WINDOW) İÇERİĞİ HAZIRLA
+                var content = '<div class="p-1" style="min-width: 220px;">';
+                
+                // Başlık
+                content += '<h6 class="fw-bold text-primary mb-1 border-bottom pb-1">' + w.name + '</h6>';
+                content += '<div class="small text-muted mb-2">Sector: ' + w.sector_name + '</div>';
+
+                // 1. AKTİF GÖREVLER
+                content += '<div class="mb-2">';
+                if (w.active_teams.length > 0) {
+                    content += '<strong class="text-success"><i class="fas fa-running"></i> Active Now:</strong>';
+                    content += '<ul class="list-unstyled mb-0 ms-1 small">';
+                    w.active_teams.forEach(t => {
+                        content += '<li class="mb-2">';
+                        content += '<span class="fw-bold">' + t.team + '</span>';
+                        // BUTON EKLEME:
+                        content += ' <a href="/operations/' + t.assignment_id + '/dashboard/" class="btn btn-xs btn-warning py-0 px-1 ms-1" style="font-size:10px;">Forms</a>';
+                        content += '<br><span class="text-muted" style="font-size:10px;">Started: ' + t.start + '</span>';
+                        content += '</li>';
+                    });
+                    content += '</ul>';
+                } else {
+                    content += '<span class="badge bg-secondary">No Active Teams</span>';
+                }
+                content += '</div>';
+
+                // 2. GEÇMİŞ GÖREVLER
+                content += '<div class="mb-2">';
+                if (w.history_teams.length > 0) {
+                    content += '<strong class="text-secondary"><i class="fas fa-history"></i> History:</strong>';
+                    content += '<div style="max-height: 80px; overflow-y: auto; background: #f8f9fa; border: 1px solid #eee; padding: 4px;">';
+                    content += '<ul class="list-unstyled mb-0 small text-muted">';
+                    w.history_teams.forEach(t => {
+                        content += '<li>' + t.team + '</li>';
+                    });
+                    content += '</ul></div>';
+                }
+                content += '</div>';
+
+                // 3. AKSİYON BUTONU (Yeni Atama Yap)
+                // Bu butona basınca Create sayfasına gider ve Worksite ID'sini parametre olarak taşır (Opsiyonel Geliştirme)
+                content += '<div class="d-grid mt-2">';
+                content += '<a href="/operations/assign/?worksite_id=' + w.id + '" class="btn btn-sm btn-outline-primary"><i class="fas fa-plus-circle"></i> Assign Team</a>';
+                content += '</div>';
+                
+                content += '</div>'; // End container
+
+                // Haritaya Ekle (GeoJSON)
+                L.geoJSON(w.geometry, {
+                    // Eğer Aktif Görev varsa Yeşil, yoksa Kırmızı stil
+                    style: { 
+                        color: w.active_teams.length > 0 ? '#1cc88a' : '#dc3545', 
+                        weight: 2, opacity: 0.9, fillOpacity: 0.5 
+                    },
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 8, 
+                            fillColor: w.active_teams.length > 0 ? '#1cc88a' : '#dc3545', 
+                            color: "#fff", weight: 2, fillOpacity: 0.8
+                        });
+                    }
+                }).bindPopup(content).addTo(worksiteLayerGroup);
+            }
+        });
+
+        // Haritayı verilerin olduğu yere sığdır
+        if (worksiteLayerGroup.getLayers().length > 0) {
+            map.fitBounds(worksiteLayerGroup.getBounds(), {padding: [50, 50]});
+        }
+    }
+
+    // --- TOGGLE MANTIĞI ---
+    document.getElementById('toggleSectors').addEventListener('change', function() {
+        this.checked ? map.addLayer(sectorLayerGroup) : map.removeLayer(sectorLayerGroup);
+    });
+    document.getElementById('toggleWorksites').addEventListener('change', function() {
+        this.checked ? map.addLayer(worksiteLayerGroup) : map.removeLayer(worksiteLayerGroup);
+    });
+
+    // --- DATATABLES ---
+    $(document).ready(function() {
+        $('#opsTable').DataTable({
+            order: [[3, 'desc']], // Start Time'a göre sırala (En yeni en üstte)
+            dom: 'Bfrtip',
+            buttons: ['excel', 'pdf', 'print']
+        });
+    });
+</script>
+{% endblock %}

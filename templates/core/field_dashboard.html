@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0 text-primary fw-bold"><i class="fas fa-clipboard-check me-2"></i>Field Assessment Dashboard</h4>
+        <div class="text-muted small">
+            <i class="fas fa-map-marker-alt me-1"></i> {{ worksite.name }} &nbsp;|&nbsp; 
+            <i class="fas fa-users me-1"></i> {{ assignment.team.name }}
+        </div>
+    </div>
+    <a href="{% url 'assignment_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left me-1"></i> Back to Ops
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card shadow border-left-info">
+            
+            <div class="card-header py-3 d-flex justify-content-between align-items-center bg-white">
+                <h6 class="m-0 font-weight-bold text-info">1. Site General Info (Sec A-C)</h6>
+                <a href="{% url 'add_site_assessment' assignment.id %}" class="btn btn-info btn-sm text-white">
+                    <i class="fas fa-plus me-1"></i> New Site Report
+                </a>
+            </div>
+
+            <div class="card-body">
+                {% for report in site_reports %}
+                    <div class="border rounded p-3 mb-4 bg-light shadow-sm">
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span class="badge bg-info">Report #{{ report.id }}</span>
+                                <small class="text-muted ms-2">{{ report.created_at|date:"d M H:i" }}</small>
+                                <div class="mt-1 small"><strong>Type:</strong> {{ report.get_site_type_display }}</div>
+                            </div>
+                            <a href="{% url 'add_intangible_heritage' assignment.id %}" class="btn btn-sm btn-outline-dark">
+                                <i class="fas fa-hands-helping me-1"></i> Add Intangible Heritage
+                            </a>
+                        </div>
+
+                        <div class="mt-3 ps-3 border-start border-3 border-warning">
+                            <h6 class="small fw-bold text-warning mb-2">2. Buildings in this Site</h6>
+                            
+                            {% for b in report.buildings.all %}
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                                        <div>
+                                            <i class="fas fa-building text-secondary me-1"></i> 
+                                            <strong>{{ b.building_name }}</strong>
+                                            <span class="badge bg-light text-dark border ms-1">{{ b.building_code }}</span>
+                                        </div>
+                                        <div class="btn-group">
+                                            <a href="{% url 'add_damage_assessment' assignment.id b.id %}" class="btn btn-sm btn-outline-danger" title="Add Damage"><i class="fas fa-house-damage"></i></a>
+                                            <a href="{% url 'add_movable_heritage' assignment.id b.id %}" class="btn btn-sm btn-outline-primary" title="Add Assets"><i class="fas fa-gem"></i></a>
+                                        </div>
+                                    </div>
+
+                                    <div class="card-body p-0">
+                                        {% if b.damages.exists %}
+                                            <div class="bg-white border-bottom p-2">
+                                                <small class="text-danger fw-bold d-block mb-1 px-1"><i class="fas fa-exclamation-triangle me-1"></i> Reported Damages</small>
+                                                {% for damage in b.damages.all %}
+                                                    <div class="d-flex justify-content-between align-items-center px-2 py-1 small border-bottom-dashed">
+                                                        <span><strong>{{ damage.get_hazard_type_display }}</strong> - {{ damage.editor_name }}</span>
+                                                        <span class="badge {% if damage.overall_damage == 'SEVERE' or damage.overall_damage == 'COLLAPSED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                                            {{ damage.get_overall_damage_display }}
+                                                        </span>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+
+                                        {% if b.assets.exists %}
+                                            <div class="p-2">
+                                                <small class="text-primary fw-bold d-block mb-2 px-1"><i class="fas fa-boxes me-1"></i> Logged Assets</small>
+                                                <ul class="list-group list-group-flush small">
+                                                    {% for asset in b.assets.all %}
+                                                        <li class="list-group-item bg-transparent py-2 px-1">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <div>
+                                                                    <strong>{{ asset.object_name }}</strong>
+                                                                    <span class="text-muted ms-1">({{ asset.category }})</span>
+                                                                </div>
+                                                                <div class="btn-group">
+                                                                    <a href="{% url 'add_movable_tracking' asset.id %}" class="btn btn-xs btn-outline-success px-2" title="Track/Transfer">
+                                                                        <i class="fas fa-truck-loading me-1"></i> Track
+                                                                    </a>
+                                                                    <a href="{% url 'edit_movable_heritage' asset.id %}" class="btn btn-xs btn-outline-secondary px-1"><i class="fas fa-pen fa-xs"></i></a>
+                                                                </div>
+                                                            </div>
+                                                            {% for move in asset.movements.all %}
+                                                                <div class="mt-1 ps-3 text-success border-start border-success" style="font-size: 0.8em;">
+                                                                    <i class="fas fa-exchange-alt me-1"></i> {{ move.transfer_date|date:"d M" }}: {{ move.from_location }} &rarr; {{ move.to_location }}
+                                                                </div>
+                                                            {% endfor %}
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        {% if assignment.intangibleheritage_reports.exists %}
+                            <div class="mt-3 ps-3 border-start border-3 border-dark">
+                                <h6 class="small fw-bold text-dark mb-2">3. Intangible Cultural Heritage (Sec. T-Z)</h6>
+                                <div class="row px-2">
+                                    {% for ich in assignment.intangibleheritage_reports.all %}
+                                        <div class="col-md-6 mb-2">
+                                            <div class="p-2 bg-white border rounded shadow-sm small">
+                                                <div class="d-flex justify-content-between">
+                                                    <strong><i class="fas fa-hands-helping text-dark me-1"></i> {{ ich.element_name }}</strong>
+                                                    <span class="text-muted x-small">{{ ich.created_at|date:"d M" }}</span>
+                                                </div>
+                                                <div class="text-muted mt-1 ps-3 border-start">
+                                                    <i class="fas fa-users me-1"></i> {{ ich.community_contact|default:"No contact info" }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+
+                    </div>
+                {% empty %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-folder-open fa-3x mb-3 text-gray-300"></i>
+                        <p class="mb-1">No assessment reports created yet.</p>
+                        <small>Click "New Site Report" to begin the mission assessment.</small>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="card-footer bg-white border-top-0 pb-4 px-4">
+                 {% if site_reports %}
+                    <a href="{% url 'add_building_inventory' assignment.id site_reports.last.id %}" class="btn btn-outline-warning w-100 dashed-border py-2 fw-bold">
+                        <i class="fas fa-plus me-1"></i> Add Building Inventory to Last Report
+                    </a>
+                 {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashed-border { border-style: dashed !important; border-width: 2px !important; }
+    .x-small { font-size: 0.75rem; }
+    .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; line-height: 1.5; border-radius: 0.2rem; }
+    .border-bottom-dashed { border-bottom: 1px dashed #dee2e6; }
+</style>
+{% endblock %}

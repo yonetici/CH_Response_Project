@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Command Center</h1>
+            <small class="text-muted">CH-RIS: Cultural Heritage Response Information System</small>
+        </div>
+        <div class="d-none d-sm-block">
+            <span class="badge bg-dark p-2"><i class="fas fa-clock me-1"></i> {% now "d M Y H:i" %}</span>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Active Operations</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_assignments }} Teams</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-satellite-dish fa-2x text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Critical Damage</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ critical_buildings }} Buildings</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Recorded Assets</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_assets }} Items</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-box-open fa-2x text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Total Personnel</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_personnel }} Staff</div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-globe me-2"></i>Live Situation Map</h6>
+                    <a href="{% url 'assignment_list' %}" class="btn btn-sm btn-primary">Full Map</a>
+                </div>
+                <div class="card-body p-0">
+                    <div id="miniMap" style="height: 350px; width: 100%;"></div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <a href="{% url 'assignment_add' %}" class="card bg-primary text-white shadow h-100 text-decoration-none hover-scale">
+                        <div class="card-body d-flex align-items-center justify-content-between">
+                            <div>
+                                <h5 class="card-title mb-0"><i class="fas fa-plus-circle me-2"></i>Assign Team</h5>
+                                <small>Dispatch a team to a worksite</small>
+                            </div>
+                            <i class="fas fa-chevron-right fa-2x text-white-50"></i>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <a href="{% url 'reporting_dashboard' %}" class="card bg-success text-white shadow h-100 text-decoration-none hover-scale">
+                        <div class="card-body d-flex align-items-center justify-content-between">
+                            <div>
+                                <h5 class="card-title mb-0"><i class="fas fa-chart-pie me-2"></i>View Reports</h5>
+                                <small>Analyze damages & progress</small>
+                            </div>
+                            <i class="fas fa-chevron-right fa-2x text-white-50"></i>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-dark"><i class="fas fa-history me-2"></i>Recent Activity Feed</h6>
+                </div>
+                <div class="card-body">
+                    {% if recent_activities %}
+                        <div class="list-group list-group-flush">
+                            {% for activity in recent_activities %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1 fw-bold text-primary">{{ activity.building.building_name }}</h6>
+                                        <small class="text-muted">{{ activity.created_at|timesince }} ago</small>
+                                    </div>
+                                    <p class="mb-1 small">
+                                        <span class="badge 
+                                            {% if activity.overall_damage == 'SEVERE' %}bg-danger
+                                            {% elif activity.overall_damage == 'MODERATE' %}bg-warning text-dark
+                                            {% else %}bg-success{% endif %}">
+                                            {{ activity.get_overall_damage_display }}
+                                        </span>
+                                        Reported by <strong>{{ activity.editor_name }}</strong>
+                                    </p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-wind fa-2x mb-2"></i>
+                            <p>No recent field activity.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ map_data|json_script:"map-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // MİNİ HARİTA SCRİPTİ (Basitleştirilmiş)
+    var mapData = JSON.parse(document.getElementById('map-data').textContent);
+    
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    var map = L.map('miniMap', { center: [40.1885, 29.0610], zoom: 12, layers: [osm], zoomControl: false }); // Zoom kontrolü kapalı
+
+    // Worksite'ları Çiz
+    if (mapData.worksites) {
+        var bounds = L.latLngBounds([]);
+        mapData.worksites.forEach(function(w) {
+            if (w.geometry) {
+                // Aktif ise Yeşil, Değilse Kırmızı nokta
+                var color = w.active_teams.length > 0 ? '#1cc88a' : '#e74a3b';
+                var layer = L.geoJSON(w.geometry, {
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 5, fillColor: color, color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8
+                        });
+                    },
+                    style: { color: color, weight: 2, fillOpacity: 0.4 }
+                }).addTo(map);
+                bounds.extend(layer.getBounds());
+            }
+        });
+        if (bounds.isValid()) { map.fitBounds(bounds, {padding: [20,20]}); }
+    }
+</script>
+
+<style>
+    /* KARTLARA HOVER EFEKTİ */
+    .hover-scale { transition: transform 0.2s; }
+    .hover-scale:hover { transform: scale(1.02); cursor: pointer; }
+    .border-left-primary { border-left: .25rem solid #4e73df!important; }
+    .border-left-success { border-left: .25rem solid #1cc88a!important; }
+    .border-left-info { border-left: .25rem solid #36b9cc!important; }
+    .border-left-warning { border-left: .25rem solid #f6c23e!important; }
+    .border-left-danger { border-left: .25rem solid #e74a3b!important; }
+</style>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">Save Sector</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-light">
+                <strong><i class="fas fa-map-marked-alt"></i> Draw Sector Area</strong>
+                <small class="text-muted ms-2">(Use the polygon tool on the left)</small>
+            </div>
+            <div class="card-body p-0">
+                <div id="map" class="map-container" style="height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 1. Katmanları Tanımla
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    });
+
+    var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    // 2. Haritayı Başlat (Varsayılan OSM ile)
+    var map = L.map('map', {
+        center: [40.1885, 29.0610],
+        zoom: 12,
+        layers: [osm] // Varsayılan katman
+    });
+
+    // 3. Katman Kontrolünü Ekle (Sağ Üst Köşe)
+    var baseMaps = {
+        "Street Map": osm,
+        "Satellite": satellite
+    };
+    L.control.layers(baseMaps).addTo(map);
+
+    // --- (Geri kalan kodlar AYNI) ---
+    // Çizim Katmanı
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    // Mevcut Veri Varsa Yükle
+    var locationDataInput = document.getElementById('id_location_data');
+    if (locationDataInput.value) {
+        var geoJsonLayer = L.geoJSON(JSON.parse(locationDataInput.value), {
+            style: { color: "#ff7800", weight: 5, opacity: 0.65 }
+        });
+        geoJsonLayer.eachLayer(function (layer) {
+            drawnItems.addLayer(layer);
+        });
+        map.fitBounds(drawnItems.getBounds());
+    }
+
+    // Çizim Kontrolleri
+    var drawControl = new L.Control.Draw({
+        draw: {
+            polyline: false, circle: false, marker: false, circlemarker: false,
+            polygon: true,
+            rectangle: true
+        },
+        edit: { featureGroup: drawnItems }
+    });
+    map.addControl(drawControl);
+
+    // Çizim Olayları
+    map.on(L.Draw.Event.CREATED, function (e) {
+        drawnItems.clearLayers();
+        var layer = e.layer;
+        drawnItems.addLayer(layer);
+        updateInput();
+    });
+
+    map.on(L.Draw.Event.EDITED, updateInput);
+    map.on(L.Draw.Event.DELETED, updateInput);
+
+    function updateInput() {
+        var data = drawnItems.toGeoJSON();
+        if (data.features.length > 0) {
+            locationDataInput.value = JSON.stringify(data.features[0].geometry);
+        } else {
+            locationDataInput.value = '';
+        }
+    }
+</script>
+{% endblock %}

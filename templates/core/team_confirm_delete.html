@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Delete Team</h5>
+            </div>
+            <div class="card-body text-center p-5">
+                <h4 class="text-danger">Are you sure?</h4>
+                <p>You are about to delete <strong>{{ object.name }}</strong>.</p>
+                <p class="text-muted small">Members of this team will NOT be deleted, they will become 'Unassigned'.</p>
+                
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <a href="{% url 'team_list' %}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
