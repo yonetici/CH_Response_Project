@@ -237,15 +237,17 @@ class WorksiteUpdateView(UpdateView):
             # DÜZELTME: json.dumps() kaldırıldı
             context['sectors_json'] = sectors_data
             return context
+# core/views.py
+
 def get_operational_map_data():
     """
     Sektörler ve Worksiteları hazırlar. 
-    Worksite verisine 'active_teams' ve 'history' bilgisini ekler.
+    Worksite verisine 'active_teams' ve zaman damgalı 'history' bilgisini ekler.
     """
     sectors_data = []
     worksites_data = []
 
-    # 1. Sektörler
+    # 1. Sektörleri Hazırla
     for s in Sector.objects.exclude(location_data__isnull=True).exclude(location_data=''):
         try:
             geom = json.loads(s.location_data)
@@ -254,32 +256,40 @@ def get_operational_map_data():
             })
         except: pass
 
-    # 2. Worksites ve Operasyon Bilgisi
+    # 2. Worksites ve Detaylı Operasyon Bilgisi
     for w in Worksite.objects.exclude(location_data__isnull=True).exclude(location_data=''):
         try:
             geom = json.loads(w.location_data)
             
-            # Bu sahadaki görevlendirmeleri çek
+            # Bu sahadaki görevlendirmeleri kronolojik sırada çek
             assignments = w.assignments.all().order_by('-start_time')
             
             active_teams = []
             history_teams = []
             
             for a in assignments:
+                # İstenen Format: Gün/Ay Saat:Dakika (Örn: 08/02 15:06)
+                start_fmt = a.start_time.strftime('%d/%m %H:%M')
+                end_fmt = a.end_time.strftime('%d/%m %H:%M') if a.end_time else 'Ongoing'
+                
+                # Ortak veri yapısı
                 info = {
                     'team': a.team.name,
-                    'start': a.start_time.strftime('%Y-%m-%d %H:%M'),
-                    'end': a.end_time.strftime('%Y-%m-%d %H:%M') if a.end_time else 'Ongoing',
+                    'start': start_fmt,
+                    'end': end_fmt,
+                    'period': f"{start_fmt} - {end_fmt}", # Pop-up'ta doğrudan göstermek için
                     'status': a.status
                 }
+                
                 if a.status == 'ACTIVE':
                     active_teams.append({
-                    'team': a.team.name,
-                    'start': a.start_time.strftime('%Y-%m-%d %H:%M'),
-                    'assignment_id': a.id,  # <--- YENİ EKLENDİ
-                    'status': a.status
-                })
+                        'team': a.team.name,
+                        'start': start_fmt,
+                        'assignment_id': a.id,
+                        'status': a.status
+                    })
                 else:
+                    # Geçmiş görevleri detaylı info ile ekle
                     history_teams.append(info)
 
             worksites_data.append({
@@ -287,12 +297,14 @@ def get_operational_map_data():
                 'name': w.name,
                 'sector_name': w.sector.name if w.sector else "Unassigned",
                 'geometry': geom,
-                'active_teams': active_teams, # Pop-up için
-                'history_teams': history_teams # Pop-up için
+                'active_teams': active_teams,
+                'history_teams': history_teams
             })
         except: pass
             
     return {'sectors': sectors_data, 'worksites': worksites_data}
+
+
 def get_all_map_data():
     """
     Tüm Sektör ve Worksite verilerini Harita için hazırlar.
