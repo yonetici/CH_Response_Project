@@ -8,42 +8,34 @@ This system is fully aligned with the international **PROCULTHER-NET 2** methodo
 
 ### 1. Field Operations Management
 
-* 
-**Hierarchical Data Structure:** Organizes operations from Sectors to Worksites, and down to specific Site Assessments, Buildings, and Assets.
+* *Hierarchical Data Structure:** Organizes operations from Sectors to Worksites, and down to specific Site Assessments, Buildings, and Assets.
 
 
-* 
-**Mission Assignment:** Assigns specialized teams to specific worksites and tracks mission status (Active/Completed/Cancelled).
+* **Mission Assignment:** Assigns specialized teams to specific worksites and tracks mission status (Active/Completed/Cancelled).
 
 
-* 
-**Interactive Operational Map:** Visualizes sector boundaries and worksite points using JSON-based coordinate data.
+* **Interactive Operational Map:** Visualizes sector boundaries and worksite points using JSON-based coordinate data.
 
 
 
 ### 2. Comprehensive Assessment Modules
 
-* 
-**Damage Assessment:** Specialized matrices for Seismic, Fire, and Hydrometeorological hazards, including structural and non-structural damage analysis.
+* **Damage Assessment:** Specialized matrices for Seismic, Fire, and Hydrometeorological hazards, including structural and non-structural damage analysis.
 
 
-* 
-**Movable Cultural Heritage:** Cataloging of artifacts, including material analysis, damage condition, and evacuation priorities.
+* **Movable Cultural Heritage:** Cataloging of artifacts, including material analysis, damage condition, and evacuation priorities.
 
 
-* 
-**Logistics & Tracking:** End-to-end tracking of artifact transfers from damaged buildings to secure storage sites.
+* **Logistics & Tracking:** End-to-end tracking of artifact transfers from damaged buildings to secure storage sites.
 
 
-* 
-**Intangible Heritage (ICH):** Assessment of risks to local traditions, rituals, and community social practices following a disaster.
+* **Intangible Heritage (ICH):** Assessment of risks to local traditions, rituals, and community social practices following a disaster.
 
 
 
 ### 3. Reporting & Security
 
-* 
-**Automated PDF Reporting:** Generates comprehensive Mission Reports in PDF format directly from field data for international stakeholders.
+* **Automated PDF Reporting:** Generates comprehensive Mission Reports in PDF format directly from field data for international stakeholders.
 
 
 * **Role-Based Access Control (RBAC):** Distinct permissions for Administrators (Full Access) and Field Experts (Restricted to assigned tasks).
@@ -51,14 +43,12 @@ This system is fully aligned with the international **PROCULTHER-NET 2** methodo
 
 ## 🛠️ Technology Stack
 
-* 
-**Backend:** Python 3.13+, Django 6.0 
+* **Backend:** Python 3.13+, Django 6.0 
 
 
 * **Frontend:** HTML5, CSS3, Bootstrap 5, FontAwesome
 * **Database:** SQLite (Development), PostgreSQL (Recommended for Production)
-* 
-**Reporting:** xhtml2pdf 
+* **Reporting:** xhtml2pdf 
 
 
 
@@ -115,17 +105,13 @@ python manage.py runserver
 
 ## 📂 Project Architecture
 
-* 
-`core/models.py`: Database schemas following PROCULTHER standards (Site, Building, Damage, Movable, Intangible).
+* `core/models.py`: Database schemas following PROCULTHER standards (Site, Building, Damage, Movable, Intangible).
 
 
-* 
-`core/views.py`: Logic for the Command Center, field dashboard, and report generation.
+* `core/views.py`: Logic for the Command Center, field dashboard, and report generation.
 
 
-* 
-`core/forms.py`: Dynamic forms supporting JSONField for complex damage matrices.
-
+* `core/forms.py`: Dynamic forms supporting JSONField for complex damage matrices.
 
 * `templates/`: Responsive UI templates built with Bootstrap for field usage.
 
