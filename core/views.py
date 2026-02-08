@@ -747,3 +747,27 @@ def add_movable_tracking(request, asset_id):
     else:
         form = MovableTrackingForm(initial={'team_id': asset.assignment.team.name})
     return render(request, 'core/form_entry.html', {'form': form, 'title': f'Tracking Sheet: {asset.object_name}'})
+
+
+# core/views.py
+def team_members_list(request, team_id):
+    team = get_object_or_404(Team, id=team_id)
+    members = Personnel.objects.filter(team=team)
+    return render(request, 'core/team_members.html', {
+        'team': team,
+        'members': members
+    })
+
+def toggle_team_leader(request, personnel_id):
+    person = get_object_or_404(Personnel, id=personnel_id)
+    team = person.team
+    
+    if team.team_leader == person:
+        # Zaten liderse, liderliği kaldır
+        team.team_leader = None
+    else:
+        # Başka birini veya bu kişiyi lider yap (OneToOneField sayesinde tek kişi olur)
+        team.team_leader = person
+    
+    team.save()
+    return redirect('team_members_list', team_id=team.id)

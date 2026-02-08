@@ -9,7 +9,7 @@ from .views import (
     AssignmentListView, AssignmentCreateView, AssignmentUpdateView, reporting_dashboard,
     field_dashboard, add_site_assessment, add_building_inventory, add_damage_assessment, add_movable_heritage,
     edit_damage_assessment, delete_damage_assessment,
-    edit_movable_heritage, delete_movable_heritage, add_intangible_heritage, add_movable_tracking
+    edit_movable_heritage, delete_movable_heritage, add_intangible_heritage, add_movable_tracking, team_members_list, toggle_team_leader
 )
 from django.contrib.auth import views as auth_views
 
@@ -76,4 +76,6 @@ urlpatterns = [
     path('assets/<int:asset_id>/tracking/add/', 
          add_movable_tracking, 
          name='add_movable_tracking'),
+    path('teams/<int:team_id>/members/', team_members_list, name='team_members_list'),
+    path('teams/toggle-leader/<int:personnel_id>/', toggle_team_leader, name='toggle_team_leader'),
 ]

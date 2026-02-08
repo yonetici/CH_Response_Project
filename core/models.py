@@ -11,7 +11,14 @@ class Team(models.Model):
     description = models.TextField(blank=True, null=True, verbose_name="Description")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    team_leader = models.OneToOneField(
+            'Personnel', 
+            on_delete=models.SET_NULL, 
+            null=True, 
+            blank=True, 
+            related_name='leading_team',
+            verbose_name="Team Leader"
+        )
     def __str__(self):
         return self.name
 

@@ -43,15 +43,25 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="#"><i class="fas fa-landmark me-2"></i>CH-RESPONSE</a>
+            <a class="navbar-brand" href="{% url 'home' %}"><i class="fas fa-landmark me-2"></i>CH-RESPONSE</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarMain">
 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-    <li class="nav-item">
-        <a class="nav-link" href="#"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
-    </li>
+{% if user.is_authenticated %}
+        <li class="nav-item">
+            {% if user.is_superuser %}
+                <a class="nav-link" href="{% url 'home' %}">
+                    <i class="fas fa-chart-line me-1"></i> Admin Dashboard
+                </a>
+            {% else %}
+                <a class="nav-link" href="{% url 'assignment_list' %}">
+                    <i class="fas fa-tasks me-1"></i> My Operations
+                </a>
+            {% endif %}
+        </li>
+    {% endif %}
     
     <li class="nav-item">
         <a class="nav-link" href="{% url 'personnel_list' %}">

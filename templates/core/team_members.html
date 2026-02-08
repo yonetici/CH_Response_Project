@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users-cog me-2"></i>{{ team.name }} - Personnel List</h2>
+        <a href="{% url 'team_list' %}" class="btn btn-secondary btn-sm">Back to Teams</a>
+    </div>
+
+    <div class="card shadow">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Institution</th>
+                        <th>Role in Team</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for person in members %}
+                    <tr>
+                        <td>{{ person.first_name }} {{ person.last_name }}</td>
+                        <td>{{ person.institution }}</td>
+                        <td>
+                            {% if team.team_leader == person %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-star me-1"></i>Team Leader</span>
+                            {% else %}
+                                <span class="text-muted">Member</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if team.team_leader == person %}
+                                <a href="{% url 'toggle_team_leader' person.id %}" class="btn btn-sm btn-danger" title="Remove Leadership">
+                                    <i class="fas fa-user-minus"></i> Remove Leader
+                                </a>
+                            {% else %}
+                                <a href="{% url 'toggle_team_leader' person.id %}" class="btn btn-sm btn-success" title="Assign as Leader">
+                                    <i class="fas fa-user-shield"></i> Set as Leader
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

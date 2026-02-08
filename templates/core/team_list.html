@@ -40,8 +40,8 @@
                         <td class="fw-bold text-primary">{{ team.name }}</td>
                         <td>{{ team.description|default:"-"|truncatewords:10 }}</td>
                         
-                        <td class="text-center">
-                            <span class="badge bg-secondary rounded-pill">{{ team.members.count }}</span>
+                        <td class="text-center"><a href="{% url 'team_members_list' team.id %}">
+                            <span class="badge bg-secondary rounded-pill">{{ team.members.count }}</span></a>
                         </td>
 
                         <td>
