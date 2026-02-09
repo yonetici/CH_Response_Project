@@ -20,20 +20,19 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-bordered table-hover" id="worksiteTable" width="100%">
+            <table class="table table-bordered table-hover align-middle" id="worksiteTable" width="100%">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
-                        <th>Worksite Name</th>
-                        <th>Assigned Sector</th>
-                        <th>Description</th>
-                        <th>Created At</th>
-                        <th>Actions</th>
-                    </tr>
+                        <th style="width: 5%">ID</th>
+                        <th style="width: 20%">Worksite Name</th>
+                        <th style="width: 15%">Assigned Sector</th>
+                        <th style="width: 20%">Description</th>
+                        <th style="width: 15%">Status</th> <th style="width: 10%">Created At</th>
+                        <th style="width: 15%" class="text-center">Actions</th> </tr>
                 </thead>
                 <tbody>
                     {% for ws in worksites %}
-                    <tr>
+                    <tr class="{% if ws.status == 'COMPLETED' %}table-success{% endif %}">
                         <td>{{ ws.id }}</td>
                         <td class="fw-bold">{{ ws.name }}</td>
                         <td>
@@ -46,10 +45,33 @@
                                 <span class="badge bg-secondary">Unassigned</span>
                             {% endif %}
                         </td>
-                        <td>{{ ws.description|default:"-" }}</td>
-                        <td>{{ ws.created_at|date:"d M Y" }}</td>
+                        <td>{{ ws.description|default:"-"|truncatewords:5 }}</td>
+                        
                         <td class="text-center">
-                            <a href="{% url 'worksite_edit' ws.pk %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-edit"></i></a>
+                            {% if ws.status == 'COMPLETED' %}
+                                <span class="badge bg-success w-100 py-2"><i class="fas fa-check-circle me-1"></i> Closed</span>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                                    {{ ws.completion_date|date:"d M Y" }}
+                                </div>
+                            {% else %}
+                                <span class="badge bg-primary w-100 py-2">Active / Open</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ ws.created_at|date:"d M Y" }}</td>
+                        
+                        <td class="text-center">
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'worksite_edit' ws.pk %}" class="btn btn-outline-primary btn-sm" title="Edit Details">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                
+                                {% if ws.status != 'COMPLETED' %}
+                                    <a href="{% url 'worksite_edit' ws.pk %}" class="btn btn-outline-success btn-sm" title="Complete / Close Worksite">
+                                        <i class="fas fa-check-double"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -78,7 +100,7 @@
 
     L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
 
-    // 1. Sektörleri Çiz (Arka Plan)
+    // 1. Sektörleri Çiz
     if (mapData.sectors) {
         mapData.sectors.forEach(function(s) {
             if (s.geometry) {
@@ -92,63 +114,85 @@
         });
     }
 
-    // 2. Worksite'ları Çiz (Marker VEYA Polygon)
+    // 2. Worksite'ları Çiz (Hasar Rengine Göre)
     var worksiteLayerGroup = L.featureGroup().addTo(map);
 
     if (mapData.worksites) {
         mapData.worksites.forEach(function(w) {
             if (w.geometry) {
-                
-                // DÜZELTME BURADA: Backend'den gelen 'damage_color'ı alıyoruz.
-                // Eğer veri gelmezse varsayılan olarak Gri (#858796) olsun.
+                // Backend'den gelen 'damage_color'ı kullan (get_all_map_data fonksiyonundan gelir)
+                // Eğer veri gelmezse varsayılan gri (#858796) olur.
                 var dynamicColor = w.damage_color || '#858796'; 
 
-                // Marker veya Polygon fark etmeksizin GeoJSON olarak ekle
                 L.geoJSON(w.geometry, {
-                    // style ayarında sabit renk yerine 'dynamicColor' değişkenini kullanıyoruz
                     style: { 
-                        color: dynamicColor,       // Kenarlık Rengi
-                        fillColor: dynamicColor,   // Dolgu Rengi
+                        color: dynamicColor,        // Kenarlık Rengi
+                        fillColor: dynamicColor,    // Dolgu Rengi
                         weight: 3, 
                         opacity: 0.9, 
                         fillOpacity: 0.5 
-                    }, 
+                    },
                     pointToLayer: function (feature, latlng) {
-                        // Eğer nokta ise, yine aynı dinamik renkte yuvarlak marker oluştur
                         return L.circleMarker(latlng, {
-                            radius: 8,
-                            fillColor: dynamicColor,
-                            color: "#fff",
-                            weight: 2,
-                            opacity: 1,
-                            fillOpacity: 0.8
+                            radius: 8, 
+                            fillColor: dynamicColor, 
+                            color: "#fff", weight: 2, fillOpacity: 0.8
                         });
                     },
-onEachFeature: function(feature, layer) {
-    // Popup içeriğine Takım Bilgisini ekle
-    var statusText = w.damage_status || 'Unknown';
-    var teamInfo = w.reporting_team !== '-' ? w.reporting_team : '<i>No Report</i>';
-    
-    var popupContent = "<b>" + w.name + "</b><br>" +
-                       "<small>Sector: " + w.sector_name + "</small><br>" +
-                       "<hr style='margin:5px 0'>" +
-                       "Status: <b style='color:" + dynamicColor + "'>" + statusText + "</b><br>" +
-                       "<small class='text-muted'>Reported By: <strong>" + teamInfo + "</strong></small>"; // YENİ SATIR
+                    onEachFeature: function(feature, layer) {
+                        // Popup içeriğine Takım Bilgisini ve Hasar Durumunu ekle
+                        var statusText = w.damage_status || 'Unknown';
+                        // reporting_team view'da tanımlandıysa kullan, yoksa '-' göster
+                        var teamInfo = (w.reporting_team && w.reporting_team !== '-') ? w.reporting_team : '<i>No Report</i>';
+                        
+                        var popupContent = "<b>" + w.name + "</b><br>" +
+                                           "<small>Sector: " + w.sector_name + "</small><br>" +
+                                           "<hr style='margin:5px 0'>" +
+                                           "Damage: <b style='color:" + dynamicColor + "'>" + statusText + "</b><br>" +
+                                           "<small class='text-muted'>Reported By: <strong>" + teamInfo + "</strong></small>";
 
-    layer.bindPopup(popupContent);
-}
+                        layer.bindPopup(popupContent);
+                    }
                 }).addTo(worksiteLayerGroup);
             }
         });
         
-        // Haritayı verilere odakla
         if (worksiteLayerGroup.getLayers().length > 0) {
             map.fitBounds(worksiteLayerGroup.getBounds(), { padding: [50, 50] });
         }
     }
 
+    // LEJANT (RENK AÇIKLAMASI)
+    var legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'card p-2 shadow small');
+        div.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        
+        var grades = [
+            {color: '#858796', label: 'Not Assessed'},
+            {color: '#1cc88a', label: 'No Damage'},
+            {color: '#f6c23e', label: 'Light'},
+            {color: '#fd7e14', label: 'Moderate'},
+            {color: '#e74a3b', label: 'Severe/Collapse'}
+        ];
+
+        div.innerHTML += '<strong>Damage Levels</strong><br><hr class="my-1">';
+        for (var i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+                '<div class="d-flex align-items-center mb-1">' +
+                '<span style="background:' + grades[i].color + '; width:15px; height:15px; display:inline-block; margin-right:5px; border-radius:3px;"></span>' +
+                '<span>' + grades[i].label + '</span></div>';
+        }
+        return div;
+    };
+    legend.addTo(map);
+
     $(document).ready(function() {
-        $('#worksiteTable').DataTable({ dom: 'Bfrtip', buttons: ['excel', 'pdf', 'print'] });
+        $('#worksiteTable').DataTable({ 
+            dom: 'Bfrtip', 
+            buttons: ['excel', 'pdf', 'print'],
+            order: [[0, 'desc']] 
+        });
     });
 </script>
 {% endblock %}

@@ -642,9 +642,9 @@ def reporting_dashboard(request):
 def download_mission_report(request):
     """
     Sıfırıncı dakikadan bugüne tüm operasyonun detaylı PDF raporunu üretir.
-    (xhtml2pdf kullanılarak - Ek kurulum gerektirmez)
+    Geliştirilmiş İstatistikler ve İK Verileri Eklenmiştir.
     """
-    # --- 1. VERİLERİ HAZIRLA (Burada değişiklik yok) ---
+    # --- 1. MEVCUT SAHA VERİLERİ ---
     total_sites = SiteAssessment.objects.count()
     total_buildings = BuildingInventory.objects.count()
     
@@ -655,15 +655,11 @@ def download_mission_report(request):
     for d in damage_counts:
         if d['overall_damage'] == 'SEVERE': severe_count = d['count']
         if d['overall_damage'] == 'COLLAPSED': collapsed_count = d['count']
-    
     critical_total = severe_count + collapsed_count
 
     # Detaylı Saha Verileri
     all_sites = SiteAssessment.objects.prefetch_related(
-        'buildings',
-        'buildings__damages',
-        'buildings__assets',
-        'assignment__team'
+        'buildings', 'buildings__damages', 'buildings__assets', 'assignment__team'
     ).order_by('created_at')
 
     # Kırmızı Liste
@@ -675,9 +671,49 @@ def download_mission_report(request):
     total_assets = MovableHeritage.objects.count()
     assets_list = MovableHeritage.objects.select_related('building').all()
 
+    # --- 2. YENİ EKLENEN VERİLER (İNSAN KAYNAKLARI & OPERASYON) ---
+    
+    # A. Personel İstatistikleri
+    total_personnel = Personnel.objects.count()
+    
+    # SQ Type Listesi (Building, Movable, Observer)
+    sq_stats = Personnel.objects.values('sq_number').annotate(total=Count('id')).order_by('-total')
+    
+    # Main Expertise (DRM, CH, BOTH)
+    expertise_stats = Personnel.objects.values('primary_expertise__code').annotate(total=Count('id')).order_by('-total')
+    
+    # Ülkelere Göre Dağılım
+    country_stats = Personnel.objects.values('country__name').annotate(total=Count('id')).order_by('-total')
+    total_countries = country_stats.count()
+
+    # Professional Profile (Job Titles üzerinden metin analizi)
+    # En çok tekrar eden ilk 10 unvanı alıp metin haline getireceğiz
+    top_jobs = Personnel.objects.values('job_titles__title').annotate(total=Count('id')).order_by('-total')[:8]
+    job_profile_text = ", ".join([f"{j['job_titles__title']} ({j['total']})" for j in top_jobs if j['job_titles__title']])
+
+    # B. Operasyonel İstatistikler
+    total_sectors = Sector.objects.count()
+    total_worksites = Worksite.objects.count()
+    completed_worksites = Worksite.objects.filter(status='COMPLETED').count()
+    ongoing_worksites = total_worksites - completed_worksites
+    
+    total_teams = Team.objects.count()
+    active_assignments = Assignment.objects.filter(status='ACTIVE').count()
+
+    # --- 3. OTOMATİK RAPOR METNİ (NARRATIVE) ---
+    narrative_text = (
+        f"The Cultural Heritage Response Operation is currently active across {total_sectors} designated sectors, "
+        f"covering a total of {total_worksites} worksites. To date, {completed_worksites} worksites have been successfully closed/completed. "
+        f"The operation is supported by a multinational force of {total_personnel} experts from {total_countries} different countries. "
+        f"The field teams are structured into {total_teams} operational units, currently managing {active_assignments} active assignments. "
+        f"The primary focus remains on damage assessment and emergency salvage of movable heritage."
+    )
+
     context = {
         'report_date': timezone.now(),
         'generated_by': request.user.get_full_name() or request.user.username,
+        
+        # Mevcut Veriler
         'total_sites': total_sites,
         'total_buildings': total_buildings,
         'critical_total': critical_total,
@@ -685,20 +721,26 @@ def download_mission_report(request):
         'red_list': red_list,
         'total_assets': total_assets,
         'assets_list': assets_list,
+
+        # Yeni Veriler
+        'total_personnel': total_personnel,
+        'sq_stats': sq_stats,
+        'expertise_stats': expertise_stats,
+        'country_stats': country_stats,
+        'job_profile_text': job_profile_text,
+        'total_sectors': total_sectors,
+        'total_worksites': total_worksites,
+        'completed_worksites': completed_worksites,
+        'ongoing_worksites': ongoing_worksites,
+        'total_teams': total_teams,
+        'narrative_text': narrative_text,
     }
 
-    # --- 2. PDF OLUŞTURMA (DEĞİŞEN KISIM) ---
-    
-    # HTML'i string olarak al
+    # --- 4. PDF OLUŞTURMA ---
     html_string = render_to_string('core/report_pdf_template.html', context)
-    
-    # PDF için bellekte bir dosya (buffer) oluştur
     result = BytesIO()
-    
-    # xhtml2pdf ile dönüştür (encoding önemli)
     pdf = pisa.pisaDocument(BytesIO(html_string.encode("UTF-8")), result)
     
-    # Hata kontrolü
     if not pdf.err:
         response = HttpResponse(result.getvalue(), content_type='application/pdf')
         filename = f"Mission_Report_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
@@ -706,7 +748,6 @@ def download_mission_report(request):
         return response
     else:
         return HttpResponse("Error Rendering PDF", status=400)
-    
 def edit_damage_assessment(request, pk):
     damage = get_object_or_404(DamageAssessment, pk=pk)
     assignment = damage.assignment # Dashboard'a dönmek için lazım
