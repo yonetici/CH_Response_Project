@@ -13,6 +13,7 @@ from io import BytesIO
 from xhtml2pdf import pisa
 from .utils import generate_random_password
 
+
 def home(request):
     """
     Ana Dashboard: Canlı özet, son aktiviteler ve hızlı menü.
@@ -573,68 +574,122 @@ def add_movable_heritage(request, assignment_id, building_id):
 
 def reporting_dashboard(request):
     """
-    Yönetici Özet Ekranı: İstatistikler, Grafikler ve Acil Durumlar
+    Yönetici Özet Ekranı (Dashboard)
+    PDF Raporu ile senkronize, zenginleştirilmiş veri seti.
     """
-    # 1. TEMEL KARTLAR (KPIs)
+    # --- 1. KPI KARTLARI (EN ÜST SATIR) ---
     total_sites = SiteAssessment.objects.count()
     total_buildings = BuildingInventory.objects.count()
     total_assets = MovableHeritage.objects.count()
     
-    # Toplam Operasyon Sayısı (Atanan vs Tamamlanan)
-    # Not: Assignment modelinde 'status' alanını kullanıyoruz
-    total_assignments = Assignment.objects.count()
-    completed_assignments = Assignment.objects.filter(status='COMPLETED').count()
-    completion_rate = int((completed_assignments / total_assignments) * 100) if total_assignments > 0 else 0
+    # Operasyonel Tamamlanma (Worksite Bazlı)
+    total_worksites = Worksite.objects.count()
+    completed_worksites = Worksite.objects.filter(status='COMPLETED').count()
+    completion_rate = int((completed_worksites / total_worksites) * 100) if total_worksites > 0 else 0
 
-    # 2. HASAR DAĞILIMI (PASTA GRAFİK VERİSİ)
-    # Veritabanından hasar türlerine göre gruplayıp sayılarını alıyoruz
+    # --- 2. GRAFİK 1: HASAR DAĞILIMI (PASTA GRAFİK) ---
     damage_stats = DamageAssessment.objects.values('overall_damage').annotate(total=Count('id'))
     
-    # Grafik için etiket ve veri listelerini hazırla
     damage_labels = []
     damage_data = []
     damage_colors = []
     
-    color_map = {
+    damage_color_map = {
         'NONE': '#1cc88a',      # Yeşil
         'LIGHT': '#f6c23e',     # Sarı
         'MODERATE': '#fd7e14',  # Turuncu
         'SEVERE': '#e74a3b',    # Kırmızı
-        'COLLAPSED': '#5a5c69'  # Koyu Gri
+        'COLLAPSED': '#5a5c69'  # Koyu Gri/Siyah
     }
 
     for stat in damage_stats:
-        # DB'deki 'SEVERE' yazısını listeye ekle
-        damage_labels.append(stat['overall_damage']) 
+        damage_labels.append(stat['overall_damage'])
         damage_data.append(stat['total'])
-        # Rengi belirle
-        damage_colors.append(color_map.get(stat['overall_damage'], '#858796'))
+        damage_colors.append(damage_color_map.get(stat['overall_damage'], '#858796'))
 
-    # 3. KIRMIZI LİSTE (ACİL MÜDAHALE GEREKENLER)
-    # Ağır hasarlı (SEVERE) veya Yıkık (COLLAPSED) binaları çek
-    red_list_buildings = DamageAssessment.objects.filter(
+    # --- 3. GRAFİK 2: UZMANLIK DAĞILIMI (BAR GRAFİK) ---
+    # Personnel tablosundan uzmanlık alanlarına göre sayıları alıyoruz
+    expertise_stats = Personnel.objects.values('primary_expertise__code').annotate(total=Count('id')).order_by('-total')
+    
+    exp_labels = []
+    exp_data = []
+    # Bootstrap renklerini sırayla kullanalım
+    exp_colors = ['#4e73df', '#36b9cc', '#858796', '#f6c23e'] 
+
+    for stat in expertise_stats:
+        code = stat['primary_expertise__code'] or "Unspecified"
+        exp_labels.append(code)
+        exp_data.append(stat['total'])
+    
+    # --- 4. İNSAN KAYNAKLARI VE DETAYLAR ---
+    total_personnel = Personnel.objects.count()
+    
+    # SQ Type İstatistikleri
+    sq_stats = Personnel.objects.values('sq_number').annotate(total=Count('id')).order_by('-total')
+    
+    # Ülke İstatistikleri (İlk 5 ülkeyi göster, gerisi 'Others')
+    country_stats_raw = Personnel.objects.values('country__name').annotate(total=Count('id')).order_by('-total')
+    total_countries = country_stats_raw.count()
+    country_stats = country_stats_raw[:8] # Listede göstermek için ilk 8
+
+    # Professional Profile Metni (En çok tekrar eden unvanlar)
+    top_jobs = Personnel.objects.values('job_titles__title').annotate(total=Count('id')).order_by('-total')[:6]
+    job_profile_text = ", ".join([f"{j['job_titles__title']} ({j['total']})" for j in top_jobs if j['job_titles__title']])
+
+    # --- 5. OPERASYONEL DURUM ---
+    total_sectors = Sector.objects.count()
+    total_teams = Team.objects.count()
+    ongoing_worksites = total_worksites - completed_worksites
+
+    # --- 6. RİSK VE PERFORMANS ---
+    # Kırmızı Liste (Severe/Collapsed)
+    red_list = DamageAssessment.objects.filter(
         overall_damage__in=['SEVERE', 'COLLAPSED']
     ).select_related('building', 'building__site_assessment__worksite').order_by('-created_at')[:10]
 
-    # 4. TAKIM PERFORMANSI
-    # Hangi editör kaç rapor girmiş?
+    # Takım Performansı
     team_performance = SiteAssessment.objects.values('editor_name').annotate(
         total_reports=Count('id')
-    ).order_by('-total_reports')
+    ).order_by('-total_reports')[:5]
+
+    # --- 7. OTOMATİK RAPOR METNİ ---
+    narrative_text = (
+        f"Operation is currently active across {total_sectors} sectors with {total_worksites} worksites. "
+        f"{completed_worksites} worksites are completed ({completion_rate}%). "
+        f"Supported by {total_personnel} experts from {total_countries} countries. "
+        f"Primary focus is on {ongoing_worksites} ongoing sites and emergency salvage of {total_assets} assets."
+    )
 
     context = {
+        # KPI
         'total_sites': total_sites,
         'total_buildings': total_buildings,
         'total_assets': total_assets,
         'completion_rate': completion_rate,
         
-        # Grafik Verileri (JSON olarak template'e gidecek)
+        # Grafikler (JSON)
         'damage_labels': json.dumps(damage_labels),
         'damage_data': json.dumps(damage_data),
         'damage_colors': json.dumps(damage_colors),
+        'exp_labels': json.dumps(exp_labels),
+        'exp_data': json.dumps(exp_data),
+        'exp_colors': json.dumps(exp_colors),
         
-        'red_list': red_list_buildings,
-        'team_stats': team_performance
+        # Operasyon & İK
+        'total_personnel': total_personnel,
+        'sq_stats': sq_stats,
+        'country_stats': country_stats,
+        'total_countries': total_countries,
+        'job_profile_text': job_profile_text,
+        'total_sectors': total_sectors,
+        'total_worksites': total_worksites,
+        'ongoing_worksites': ongoing_worksites,
+        'total_teams': total_teams,
+        
+        # Tablolar ve Metin
+        'red_list': red_list,
+        'team_stats': team_performance,
+        'narrative_text': narrative_text,
     }
     
     return render(request, 'core/reporting_dashboard.html', context)

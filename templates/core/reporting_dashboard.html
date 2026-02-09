@@ -4,10 +4,28 @@
 <div class="container-fluid">
     
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-chart-line me-2"></i>Executive Situation Report</h1>
-<a href="{% url 'download_mission_report' %}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
-    <i class="fas fa-file-pdf fa-sm text-white-50"></i> Generate Official Mission Report
-</a>
+        <div>
+            <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-chart-line me-2"></i>Executive Situation Report</h1>
+            <small class="text-muted">Live Operational Data | {% now "d F Y, H:i" %}</small>
+        </div>
+        <a href="{% url 'download_mission_report' %}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-file-pdf fa-sm text-white-50 me-2"></i>Generate Official Mission Report
+        </a>
+    </div>
+
+    <div class="card bg-white border-left-warning shadow h-100 py-2 mb-4">
+        <div class="card-body">
+            <div class="row no-gutters align-items-center">
+                <div class="col mr-2">
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                        <i class="fas fa-info-circle me-1"></i> Executive Summary
+                    </div>
+                    <div class="h6 mb-0 text-gray-800 font-italic">
+                        "{{ narrative_text }}"
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row">
@@ -44,7 +62,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Mission Completion</div>
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Worksite Completion</div>
                             <div class="row no-gutters align-items-center">
                                 <div class="col-auto"><div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">%{{ completion_rate }}</div></div>
                                 <div class="col">
@@ -54,21 +72,22 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-auto"><i class="fas fa-clipboard-list fa-2x text-gray-300"></i></div>
+                        <div class="col-auto"><i class="fas fa-tasks fa-2x text-gray-300"></i></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card border-left-dark shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Movable Assets</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_assets }}</div>
+                            <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">Total Personnel</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_personnel }}</div>
+                            <div class="text-xs text-muted">From {{ total_countries }} Countries</div>
                         </div>
-                        <div class="col-auto"><i class="fas fa-gem fa-2x text-gray-300"></i></div>
+                        <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
                     </div>
                 </div>
             </div>
@@ -79,74 +98,144 @@
         
         <div class="col-xl-4 col-lg-5">
             <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-white">
-                    <h6 class="m-0 font-weight-bold text-primary">Global Damage Distribution</h6>
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Global Damage Overview</h6>
                 </div>
                 <div class="card-body">
                     <div class="chart-pie pt-4 pb-2">
                         <canvas id="damagePieChart"></canvas>
                     </div>
                     <div class="mt-4 text-center small text-muted">
-                        Hover over slices to see detailed counts.
+                        Real-time damage assessment data from field reports.
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-8 col-lg-7">
+        <div class="col-xl-4 col-lg-4">
             <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-danger d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-white"><i class="fas fa-exclamation-circle me-1"></i> RED LIST: Severe Damage & Collapse</h6>
-                    <span class="badge bg-white text-danger">Urgent Intervention Needed</span>
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">HR Expertise Distribution</h6>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover" width="100%" cellspacing="0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Worksite</th>
-                                    <th>Building</th>
-                                    <th>Damage Level</th>
-                                    <th>Hazard Type</th>
-                                    <th>Team Lead</th>
-                                </tr>
+                    <div class="chart-bar">
+                        <canvas id="expertiseBarChart"></canvas>
+                    </div>
+                    <hr>
+                    <div class="small">
+                        <strong>Top Profiles:</strong> {{ job_profile_text }}...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-3">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Participants by Country</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                        <table class="table table-striped table-sm mb-0">
+                            <thead>
+                                <tr><th>Country</th><th class="text-end">Pax</th></tr>
                             </thead>
                             <tbody>
-                                {% for item in red_list %}
+                                {% for c in country_stats %}
                                 <tr>
-                                    <td>{{ item.building.site_assessment.worksite.name }}</td>
-                                    <td class="fw-bold">{{ item.building.building_name }}</td>
-                                    <td class="text-center">
-                                        <span class="badge {% if item.overall_damage == 'COLLAPSED' %}bg-dark{% else %}bg-danger{% endif %} w-100">
-                                            {{ item.overall_damage }}
-                                        </span>
-                                    </td>
-                                    <td>{{ item.get_hazard_type_display }}</td>
-                                    <td class="small">{{ item.editor_name }}</td>
+                                    <td>{{ c.country__name }}</td>
+                                    <td class="text-end fw-bold">{{ c.total }}</td>
                                 </tr>
-                                {% empty %}
-                                <tr><td colspan="5" class="text-center text-muted">No severe damages reported yet.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
+    <div class="row">
+        
+        <div class="col-xl-6 col-lg-6">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Field Team Performance</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Operational Status</h6>
                 </div>
                 <div class="card-body">
-                    {% for team in team_stats %}
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small font-weight-bold">{{ team.editor_name }}</span>
-                            <span class="small">{{ team.total_reports }} reports</span>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <h4 class="small font-weight-bold">Sectors Active <span class="float-right">{{ total_sectors }}</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: 100%"></div>
+                            </div>
+                            <h4 class="small font-weight-bold">Worksites Ongoing <span class="float-right">{{ ongoing_worksites }} / {{ total_worksites }}</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-warning" role="progressbar" style="width: {% widthratio ongoing_worksites total_worksites 100 %}%"></div>
+                            </div>
                         </div>
-                        <div class="progress mb-3" style="height: 6px;">
-                            <div class="progress-bar bg-success" role="progressbar" style="width: {% widthratio team.total_reports 20 100 %}%"></div>
+                        <div class="col-md-6 mb-4">
+                            <h4 class="small font-weight-bold">Field Teams <span class="float-right">{{ total_teams }}</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: 100%"></div>
+                            </div>
+                            <h4 class="small font-weight-bold">Movable Assets <span class="float-right">{{ total_assets }}</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-success" role="progressbar" style="width: 100%"></div>
+                            </div>
                         </div>
-                    {% endfor %}
+                    </div>
+                    
+                    <h6 class="font-weight-bold text-secondary mt-3">Personnel by SQ Type:</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for sq in sq_stats %}
+                        <span class="badge bg-secondary p-2">
+                            {{ sq.sq_number|default:"OTHER" }}: {{ sq.total }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-danger d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-white"><i class="fas fa-exclamation-triangle me-2"></i>Critical Red List</h6>
+                    <span class="badge bg-white text-danger">Top 10 Urgent</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover mb-0" width="100%">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Worksite</th>
+                                    <th>Damage</th>
+                                    <th>Hazard</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in red_list %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ item.building.site_assessment.worksite.name }}</div>
+                                        <small class="text-muted">{{ item.building.building_name }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.overall_damage == 'COLLAPSED' %}
+                                            <span class="badge bg-dark w-100">COLLAPSED</span>
+                                        {% else %}
+                                            <span class="badge bg-danger w-100">SEVERE</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.get_hazard_type_display }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted p-3">No critical damages reported yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -155,40 +244,55 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // View'dan gelen verileri JS değişkenlerine al
-    var labels = JSON.parse('{{ damage_labels|safe }}');
-    var data = JSON.parse('{{ damage_data|safe }}');
-    var colors = JSON.parse('{{ damage_colors|safe }}');
+    // --- 1. PASTA GRAFİK (HASAR) ---
+    var damageLabels = JSON.parse('{{ damage_labels|safe }}');
+    var damageData = JSON.parse('{{ damage_data|safe }}');
+    var damageColors = JSON.parse('{{ damage_colors|safe }}');
 
-    var ctx = document.getElementById("damagePieChart");
-    var myPieChart = new Chart(ctx, {
+    var ctxPie = document.getElementById("damagePieChart");
+    new Chart(ctxPie, {
         type: 'doughnut',
         data: {
-            labels: labels,
+            labels: damageLabels,
             datasets: [{
-                data: data,
-                backgroundColor: colors,
-                hoverBackgroundColor: colors,
+                data: damageData,
+                backgroundColor: damageColors,
                 hoverBorderColor: "rgba(234, 236, 244, 1)",
             }],
         },
         options: {
             maintainAspectRatio: false,
-            tooltips: {
-                backgroundColor: "rgb(255,255,255)",
-                bodyFontColor: "#858796",
-                borderColor: '#dddfeb',
-                borderWidth: 1,
-                xPadding: 15,
-                yPadding: 15,
-                displayColors: false,
-                caretPadding: 10,
-            },
-            legend: {
-                display: true,
-                position: 'bottom'
-            },
+            legend: { position: 'bottom' },
             cutoutPercentage: 70,
+        },
+    });
+
+    // --- 2. BAR GRAFİK (UZMANLIK) ---
+    var expLabels = JSON.parse('{{ exp_labels|safe }}');
+    var expData = JSON.parse('{{ exp_data|safe }}');
+    var expColors = JSON.parse('{{ exp_colors|safe }}');
+
+    var ctxBar = document.getElementById("expertiseBarChart");
+    new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: expLabels,
+            datasets: [{
+                label: "Personnel Count",
+                backgroundColor: "#4e73df",
+                hoverBackgroundColor: "#2e59d9",
+                borderColor: "#4e73df",
+                data: expData,
+            }],
+        },
+        options: {
+            maintainAspectRatio: false,
+            layout: { padding: { left: 10, right: 25, top: 25, bottom: 0 } },
+            scales: {
+                xAxes: [{ gridLines: { display: false, drawBorder: false }, maxBarThickness: 25 }],
+                yAxes: [{ ticks: { min: 0, padding: 10 }, gridLines: { color: "rgb(234, 236, 244)", zeroLineColor: "rgb(234, 236, 244)", drawBorder: false, borderDash: [2] } }],
+            },
+            legend: { display: false },
         },
     });
 </script>

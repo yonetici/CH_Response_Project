@@ -198,15 +198,15 @@ class WorksiteForm(forms.ModelForm):
 
     class Meta:
             model = Worksite
-            fields = ['name', 'sector', 'description', 'location_data', 'status', 'completion_date'] # Yeni alanları ekledik
+            # Status ve completion_date alanlarının listede olduğundan emin olun
+            fields = ['name', 'sector', 'description', 'location_data', 'status', 'completion_date'] 
             widgets = {
                 'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
                 'name': forms.TextInput(attrs={'class': 'form-control'}),
                 'location_data': forms.HiddenInput(),
-                
-                # YENİ WIDGET'LAR
-                'status': forms.Select(attrs={'class': 'form-select'}),
-                'completion_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+                'status': forms.Select(attrs={'class': 'form-select', 'id': 'id_status'}), # ID önemli
+                # Tarih seçici özelliği:
+                'completion_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date', 'id': 'id_completion_date'}),
             }
 
 class AssignmentForm(forms.ModelForm):

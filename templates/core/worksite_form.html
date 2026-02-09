@@ -1,54 +1,114 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0">{{ title }}</h5>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Worksite Name</label>
-                        {{ form.name }}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Sector (Auto-detects from map)</label>
-                        {{ form.sector }}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        {{ form.description }}
-                    </div>
-                    
-                    {{ form.location_data }} <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Save Worksite</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            {% if form.instance.pk %}
+                <i class="fas fa-edit me-2"></i>Edit Worksite: {{ form.instance.name }}
+            {% else %}
+                <i class="fas fa-plus-circle me-2"></i>New Worksite
+            {% endif %}
+        </h1>
     </div>
 
-    <div class="col-md-8">
-        <div class="card shadow">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <div>
-                    <strong><i class="fas fa-map-marked-alt"></i> Draw Worksite Location</strong>
-                    <small class="text-muted ms-2">(Pin point or draw area)</small>
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center bg-light">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-map-marked-alt me-1"></i> Location & Area
+                    </h6>
+                    
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="toggleSectors" checked>
+                        <label class="form-check-label small fw-bold text-secondary" for="toggleSectors">Show Sectors</label>
+                    </div>
                 </div>
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="toggleSectors" checked>
-                    <label class="form-check-label small fw-bold" for="toggleSectors">Show Sectors</label>
+                <div class="card-body p-0">
+                    <div id="map" style="height: 550px; width: 100%;"></div>
+                </div>
+                <div class="card-footer small text-muted">
+                    <i class="fas fa-info-circle"></i> Use the toolbar on the left to draw a <strong>Polygon</strong> (area) or place a <strong>Marker</strong> (point). The system will auto-detect the Sector.
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div id="map" class="map-container" style="height: 500px;"></div>
-            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <form method="post" id="worksiteForm">
+                {% csrf_token %}
+                
+                <div style="display:none;">
+                    {{ form.location_data }}
+                </div>
+
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Worksite Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Worksite Name</label>
+                            {{ form.name }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Assigned Sector 
+                                <span class="badge bg-info ms-1"><i class="fas fa-magic"></i> Auto-Detect</span>
+                            </label>
+                            {{ form.sector }}
+                            <small class="text-muted d-block mt-1" style="font-size: 0.8rem;">
+                                Generated automatically based on the location you draw.
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            {{ form.description }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow mb-4 border-left-success">
+                    <div class="card-header py-3 bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 font-weight-bold text-success">
+                            <i class="fas fa-check-double me-1"></i> Closure & Status
+                        </h6>
+                        
+                        <button type="button" class="btn btn-sm btn-success shadow-sm" onclick="markAsCompleted()">
+                            <i class="fas fa-flag-checkered me-1"></i> Complete Now
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold small text-uppercase text-gray-600">Current Status</label>
+                                {{ form.status }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold small text-uppercase text-gray-600">Completion Date</label>
+                                {{ form.completion_date }}
+                            </div>
+                        </div>
+                        <div class="alert alert-light border small mb-0 p-2 text-muted">
+                            <i class="fas fa-lightbulb text-warning me-1"></i> 
+                            Click "Complete Now" to automatically set status to <strong>Closed</strong> and date to <strong>Today</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+                    <a href="{% url 'worksite_list' %}" class="btn btn-secondary me-md-2">
+                        <i class="fas fa-arrow-left me-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg px-4">
+                        <i class="fas fa-save me-1"></i> Save Worksite
+                    </button>
+                </div>
+
+            </form>
         </div>
     </div>
 </div>
@@ -58,13 +118,17 @@
 {% endblock %}
 
 {% block extra_js %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
 <script>
-    // 1. Verileri Al
+    // --- 1. VERİLERİN ALINMASI ---
     var allSectors = JSON.parse(document.getElementById('sectors-data').textContent);
     var locationInput = document.getElementById('id_location_data');
-    var sectorSelect = $('#id_sector');
+    var sectorSelect = $('#id_sector'); // Select2 kullanıyorsak jQuery seçicisi
 
-    // 2. Haritayı Başlat
+    // --- 2. HARİTA BAŞLATMA ---
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
     var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' });
 
@@ -76,139 +140,151 @@
 
     L.control.layers({ "Street Map": osm, "Satellite": satellite }).addTo(map);
 
-    // 3. Çizim Katmanı (Worksite İçin)
-    var drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
+    // --- 3. KATMANLAR ---
+    var drawnItems = new L.FeatureGroup().addTo(map);       // Kullanıcının çizdiği (Worksite)
+    var sectorLayerGroup = L.layerGroup().addTo(map);       // Arka plandaki sektörler
 
-    // 4. Sektör Katmanı (Referans İçin)
-    var sectorLayerGroup = L.layerGroup().addTo(map); // Başlangıçta ekli
-
-    // Sektörleri Çiz
+    // Sektörleri Çiz (Referans için)
     if (allSectors) {
         allSectors.forEach(function(s) {
             if (s.geometry) {
-                // interactive: false yaparak tıklamaların (click-through) haritaya geçmesini sağlıyoruz.
-                // Böylece sektörün üzerine yeni çizim yapabilirsiniz.
                 L.geoJSON(s.geometry, {
-                    interactive: false, 
-                    style: { color: s.color, weight: 2, fillOpacity: 0.15 }
+                    interactive: false, // Tıklamalar alttaki çizime geçsin
+                    style: { color: s.color, weight: 2, fillOpacity: 0.1, dashArray: '5, 5' }
                 }).addTo(sectorLayerGroup);
             }
         });
     }
 
-    // 5. Toggle Mantığı
+    // Toggle Sektörler
     document.getElementById('toggleSectors').addEventListener('change', function() {
-        if (this.checked) {
-            map.addLayer(sectorLayerGroup);
-        } else {
-            map.removeLayer(sectorLayerGroup);
-        }
+        if (this.checked) { map.addLayer(sectorLayerGroup); } 
+        else { map.removeLayer(sectorLayerGroup); }
     });
 
-    // 6. Mevcut Worksite Verisi Varsa Yükle (Edit Mode)
+    // --- 4. MEVCUT WORKSITE YÜKLEME (EDIT MODE) ---
     if (locationInput.value) {
         try {
             var geom = JSON.parse(locationInput.value);
-            // GeoJSON -> Leaflet Layer dönüşümü
             var layer = L.GeoJSON.geometryToLayer(geom);
             
-            // Stil ayarları (Polygon ise)
+            // Eğer Polygon ise stil ver
             if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-                layer.setStyle({ color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2 });
+                layer.setStyle({ color: '#4e73df', fillColor: '#4e73df', fillOpacity: 0.4, weight: 3 });
             }
             
             drawnItems.addLayer(layer);
-            map.fitBounds(drawnItems.getBounds(), { maxZoom: 16 });
-        } catch(e) { console.error("GeoJSON Parse Error:", e); }
+            map.fitBounds(drawnItems.getBounds(), { maxZoom: 16, padding: [50, 50] });
+        } catch(e) { console.error("GeoJSON Load Error:", e); }
     }
 
-    // 7. Çizim Kontrolleri (Polygon ve Marker Aktif)
+    // --- 5. ÇİZİM KONTROLLERİ (Leaflet.Draw) ---
     var drawControl = new L.Control.Draw({
         draw: {
             polyline: false, 
             circle: false, 
             circlemarker: false,
-            polygon: true,   // Polygon Açık
-            rectangle: true, // Rectangle Açık
-            marker: true     // Marker Açık
+            polygon: { allowIntersection: false, showArea: true },
+            rectangle: true, 
+            marker: true
         },
         edit: {
-            featureGroup: drawnItems, // Düzenleme modu
+            featureGroup: drawnItems, 
             remove: true
         }
     });
     map.addControl(drawControl);
 
-    // 8. ÇİZİM OLAYLARI (Created)
+    // --- 6. ÇİZİM OLAYLARI & SEKTÖR ALGILAMA ---
+    
+    // Yeni çizim yapıldığında
     map.on(L.Draw.Event.CREATED, function (e) {
-        drawnItems.clearLayers(); // Sadece 1 şekil çizilebilir, eskisin sil
+        drawnItems.clearLayers(); // Sadece 1 şekil olabilir
         var layer = e.layer;
-        drawnItems.addLayer(layer);
         
-        // A) Geometriyi Inputa Kaydet
-        var geometry = layer.toGeoJSON().geometry;
-        locationInput.value = JSON.stringify(geometry);
-
-        // B) Otomatik Sektör Bulma (Turf.js)
-        detectSector(geometry);
+        // Stili ayarla
+        if (layer instanceof L.Polygon) {
+            layer.setStyle({ color: '#4e73df', fillColor: '#4e73df', fillOpacity: 0.4 });
+        }
+        
+        drawnItems.addLayer(layer);
+        updateLocationAndSector(layer);
     });
 
-    // Düzenleme Olayları
+    // Çizim düzenlendiğinde
     map.on(L.Draw.Event.EDITED, function (e) {
-        var layers = e.layers;
-        layers.eachLayer(function (layer) {
-            var geometry = layer.toGeoJSON().geometry;
-            locationInput.value = JSON.stringify(geometry);
-            detectSector(geometry);
+        e.layers.eachLayer(function (layer) {
+            updateLocationAndSector(layer);
         });
     });
 
-    // --- YARDIMCI FONKSİYON: SEKTÖR ALGILAMA ---
-    function detectSector(geometry) {
-        var pointToCheck;
+    // --- YARDIMCI: Input Güncelleme ve Turf.js ile Analiz ---
+    function updateLocationAndSector(layer) {
+        // A. GeoJSON'u Input'a Yaz
+        var geometry = layer.toGeoJSON().geometry;
+        locationInput.value = JSON.stringify(geometry);
 
-        // Eğer çizilen şey NOKTA ise kendisini al
+        // B. Turf.js ile Sektör Bul
+        var pointToCheck;
         if (geometry.type === 'Point') {
             pointToCheck = turf.point(geometry.coordinates);
-        } 
-        // Eğer çizilen şey POLYGON ise MERKEZİNİ (Centroid) al
-        else {
-            pointToCheck = turf.centroid(geometry);
+        } else {
+            pointToCheck = turf.centroid(geometry); // Polygon ise merkezini al
         }
 
         var foundSectorId = null;
+        var foundSectorName = "";
 
         if (allSectors) {
             allSectors.forEach(function(s) {
                 if (s.geometry) {
-                    var sectorPolygon = turf.polygon(s.geometry.coordinates);
-                    
-                    // Nokta (veya merkez) sektörün içinde mi?
-                    if (turf.booleanPointInPolygon(pointToCheck, sectorPolygon)) {
+                    var sectorPoly = turf.polygon(s.geometry.coordinates);
+                    if (turf.booleanPointInPolygon(pointToCheck, sectorPoly)) {
                         foundSectorId = s.id;
-                        
-                        // Kullanıcıya bilgi ver
-                        var popupContent = '<div class="text-center"><i class="fas fa-check-circle text-success"></i><br>Assigned to Sector:<br><b>' + s.name + '</b></div>';
-                        
-                        // Popup'ı şeklin ortasında aç
-                        var latlng = [pointToCheck.geometry.coordinates[1], pointToCheck.geometry.coordinates[0]];
-                        L.popup().setLatLng(latlng).setContent(popupContent).openOn(map);
+                        foundSectorName = s.name;
                     }
                 }
             });
         }
 
-        // Selectbox güncelle
+        // C. Selectbox'ı Güncelle
         if (foundSectorId) {
-            sectorSelect.val(foundSectorId).trigger('change');
-        } else {
-             // Sektör bulunamadıysa (boş alan)
-             // L.popup().setLatLng(...).setContent('No Sector Found').openOn(map);
+            sectorSelect.val(foundSectorId).trigger('change'); // Select2 için trigger
+            
+            // Kullanıcıya küçük bir popup ile bilgi ver
+            var center = (layer.getBounds ? layer.getBounds().getCenter() : layer.getLatLng());
+            L.popup({closeButton: false, autoClose: true, className: 'success-popup'})
+                .setLatLng(center)
+                .setContent('<div class="text-center text-success fw-bold"><i class="fas fa-check"></i> Sector: ' + foundSectorName + '</div>')
+                .openOn(map);
         }
     }
 
-    // Select2 Init
-    $('.select2-sector').select2({ theme: 'bootstrap-5', width: '100%' });
+    // --- 7. YENİ FONKSİYON: Worksite Kapatma (JS) ---
+    function markAsCompleted() {
+        // 1. Status'ü COMPLETED yap
+        var statusField = document.getElementById('id_status');
+        if(statusField) {
+            statusField.value = 'COMPLETED';
+        }
+
+        // 2. Tarihi Bugün Yap
+        var dateField = document.getElementById('id_completion_date');
+        if(dateField) {
+            var today = new Date();
+            var yyyy = today.getFullYear();
+            var mm = String(today.getMonth() + 1).padStart(2, '0');
+            var dd = String(today.getDate()).padStart(2, '0');
+            dateField.value = yyyy + '-' + mm + '-' + dd;
+        }
+
+        // 3. Görsel Geri Bildirim
+        alert("Worksite marked as Completed for today (" + yyyy + '-' + mm + '-' + dd + ").\nDon't forget to click 'Save Worksite'.");
+    }
+
+    // Select2 Başlatma (Eğer projede varsa şık görünür)
+    $(document).ready(function() {
+        $('.select2-sector').select2({ theme: 'bootstrap-5', width: '100%' });
+    });
 </script>
 {% endblock %}
