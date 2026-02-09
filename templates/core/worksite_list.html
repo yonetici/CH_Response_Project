@@ -98,16 +98,45 @@
     if (mapData.worksites) {
         mapData.worksites.forEach(function(w) {
             if (w.geometry) {
+                
+                // DÜZELTME BURADA: Backend'den gelen 'damage_color'ı alıyoruz.
+                // Eğer veri gelmezse varsayılan olarak Gri (#858796) olsun.
+                var dynamicColor = w.damage_color || '#858796'; 
+
                 // Marker veya Polygon fark etmeksizin GeoJSON olarak ekle
                 L.geoJSON(w.geometry, {
-                    style: { color: '#dc3545', weight: 3, opacity: 0.8, fillOpacity: 0.4 }, // Worksite Rengi (Kırmızı ton)
+                    // style ayarında sabit renk yerine 'dynamicColor' değişkenini kullanıyoruz
+                    style: { 
+                        color: dynamicColor,       // Kenarlık Rengi
+                        fillColor: dynamicColor,   // Dolgu Rengi
+                        weight: 3, 
+                        opacity: 0.9, 
+                        fillOpacity: 0.5 
+                    }, 
                     pointToLayer: function (feature, latlng) {
-                        // Eğer nokta ise Marker kullan
-                        return L.marker(latlng);
+                        // Eğer nokta ise, yine aynı dinamik renkte yuvarlak marker oluştur
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: dynamicColor,
+                            color: "#fff",
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
                     },
-                    onEachFeature: function(feature, layer) {
-                        layer.bindPopup("<b>Worksite:</b> " + w.name + "<br>Sector: " + w.sector_name);
-                    }
+onEachFeature: function(feature, layer) {
+    // Popup içeriğine Takım Bilgisini ekle
+    var statusText = w.damage_status || 'Unknown';
+    var teamInfo = w.reporting_team !== '-' ? w.reporting_team : '<i>No Report</i>';
+    
+    var popupContent = "<b>" + w.name + "</b><br>" +
+                       "<small>Sector: " + w.sector_name + "</small><br>" +
+                       "<hr style='margin:5px 0'>" +
+                       "Status: <b style='color:" + dynamicColor + "'>" + statusText + "</b><br>" +
+                       "<small class='text-muted'>Reported By: <strong>" + teamInfo + "</strong></small>"; // YENİ SATIR
+
+    layer.bindPopup(popupContent);
+}
                 }).addTo(worksiteLayerGroup);
             }
         });

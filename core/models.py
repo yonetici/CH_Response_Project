@@ -145,7 +145,11 @@ class Sector(models.Model):
         ordering = ['name']
 
 # --- WORKSITE MODELİ (ÇALIŞMA ALANI) ---
-class Worksite(models.Model):
+class Worksite(models.Model):   
+    STATUS_CHOICES = [
+            ('OPEN', 'Open / Active'),
+            ('COMPLETED', 'Completed / Closed'),
+        ]
     name = models.CharField(max_length=100, verbose_name="Worksite Name")
     sector = models.ForeignKey(Sector, on_delete=models.SET_NULL, null=True, blank=True, related_name='worksites')
     description = models.TextField(blank=True, null=True)
@@ -155,7 +159,8 @@ class Worksite(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='OPEN', verbose_name="Worksite Status")
+    completion_date = models.DateField(null=True, blank=True, verbose_name="Completion Date")
     def __str__(self):
         return self.name
 

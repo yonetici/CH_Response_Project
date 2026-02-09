@@ -239,10 +239,88 @@ class WorksiteUpdateView(UpdateView):
             return context
 # core/views.py
 
+# core/views.py dosyasında get_operational_map_data fonksiyonunu değiştirin:
+
 def get_operational_map_data():
     """
-    Sektörler ve Worksiteları hazırlar. 
-    Worksite verisine 'active_teams' ve zaman damgalı 'history' bilgisini ekler.
+    Operations Haritası için veri hazırlar.
+    Renk Mantığı:
+    - Completed (Worksite Kapalı) = Green (#1cc88a)
+    - Assigned / Ongoing (Aktif Ekip Var) = Orange (#fd7e14)
+    - Not Assigned (Aktif Ekip Yok ve Açık) = Gray (#858796)
+    """
+    sectors_data = []
+    worksites_data = []
+
+    # 1. Sektörleri Hazırla (Değişiklik yok)
+    for s in Sector.objects.exclude(location_data__isnull=True).exclude(location_data=''):
+        try:
+            geom = json.loads(s.location_data)
+            sectors_data.append({
+                'id': s.id, 'name': s.name, 'color': s.color, 'geometry': geom
+            })
+        except: pass
+
+    # 2. Worksite'ları Hazırla ve Renklendir
+    for w in Worksite.objects.exclude(location_data__isnull=True).exclude(location_data=''):
+        try:
+            geom = json.loads(w.location_data)
+            
+            # Aktif görevleri kontrol et
+            active_assignments = w.assignments.filter(status='ACTIVE')
+            has_active_team = active_assignments.exists()
+            
+            # --- RENK MANTIĞI ---
+            if w.status == 'COMPLETED':
+                # İş Tamamlandı -> YEŞİL
+                map_color = '#1cc88a' 
+                status_text = f"COMPLETED ({w.completion_date or 'No Date'})"
+            elif has_active_team:
+                # Aktif Ekip Var -> TURUNCU
+                map_color = '#fd7e14'
+                status_text = "ONGOING (Team Assigned)"
+            else:
+                # Ekip Yok ve Açık -> GRİ
+                map_color = '#858796'
+                status_text = "NOT ASSIGNED"
+
+            # Pop-up verileri (Eski mantıkla aynı, sadece renk ekledik)
+            active_teams_list = []
+            for a in active_assignments:
+                active_teams_list.append({
+                    'team': a.team.name,
+                    'start': a.start_time.strftime('%d/%m %H:%M'),
+                    'assignment_id': a.id
+                })
+            
+            # Geçmiş verileri
+            history_teams = []
+            for a in w.assignments.exclude(status='ACTIVE').order_by('-end_time'):
+                history_teams.append({
+                    'team': a.team.name,
+                    'period': f"{a.start_time.strftime('%d/%m')} - {a.end_time.strftime('%d/%m') if a.end_time else '?'}"
+                })
+
+            worksites_data.append({
+                'id': w.id,
+                'name': w.name,
+                'sector_name': w.sector.name if w.sector else "Unassigned",
+                'geometry': geom,
+                'map_color': map_color,       # <--- Harita rengi
+                'status_text': status_text,   # <--- Durum metni
+                'active_teams': active_teams_list,
+                'history_teams': history_teams
+            })
+        except: pass
+            
+    return {'sectors': sectors_data, 'worksites': worksites_data}
+
+# core/views.py dosyasında get_all_map_data fonksiyonunu bu şekilde güncelleyin:
+
+def get_all_map_data():
+    """
+    Tüm Sektör ve Worksite verilerini Harita için hazırlar.
+    Worksite renkleri ve 'Raporlayan Takım' bilgisi hasar durumuna göre belirlenir.
     """
     sectors_data = []
     worksites_data = []
@@ -252,95 +330,67 @@ def get_operational_map_data():
         try:
             geom = json.loads(s.location_data)
             sectors_data.append({
-                'id': s.id, 'name': s.name, 'color': s.color, 'geometry': geom
+                'id': s.id, 'name': s.name, 'color': s.color, 
+                'geometry': geom, 'description': s.description
             })
         except: pass
 
-    # 2. Worksites ve Detaylı Operasyon Bilgisi
+    # 2. Worksite'ları Hazırla (Hasar ve Takım Analizi İle)
     for w in Worksite.objects.exclude(location_data__isnull=True).exclude(location_data=''):
         try:
             geom = json.loads(w.location_data)
             
-            # Bu sahadaki görevlendirmeleri kronolojik sırada çek
-            assignments = w.assignments.all().order_by('-start_time')
+            # Bu worksite'a bağlı tüm raporları (Takım bilgisiyle beraber) çek
+            reports = DamageAssessment.objects.filter(worksite=w).select_related('assignment__team')
             
-            active_teams = []
-            history_teams = []
-            
-            for a in assignments:
-                # İstenen Format: Gün/Ay Saat:Dakika (Örn: 08/02 15:06)
-                start_fmt = a.start_time.strftime('%d/%m %H:%M')
-                end_fmt = a.end_time.strftime('%d/%m %H:%M') if a.end_time else 'Ongoing'
+            # Varsayılan Değerler (Rapor Yoksa)
+            damage_color = '#858796' # Gri
+            damage_status = "Not Assessed"
+            reporting_team = "-" # Takım Yok
+
+            if reports.exists():
+                # Tüm hasar seviyelerini listeye al
+                damage_levels = [r.overall_damage for r in reports]
+                target_severity = 'NONE' # Varsayılan
                 
-                # Ortak veri yapısı
-                info = {
-                    'team': a.team.name,
-                    'start': start_fmt,
-                    'end': end_fmt,
-                    'period': f"{start_fmt} - {end_fmt}", # Pop-up'ta doğrudan göstermek için
-                    'status': a.status
-                }
-                
-                if a.status == 'ACTIVE':
-                    active_teams.append({
-                        'team': a.team.name,
-                        'start': start_fmt,
-                        'assignment_id': a.id,
-                        'status': a.status
-                    })
+                # En kötü durumu (Worst-Case) tespit et
+                if 'COLLAPSED' in damage_levels:
+                    target_severity = 'COLLAPSED'
+                    damage_color = '#e74a3b' 
+                    damage_status = "Critical (Collapsed)"
+                elif 'SEVERE' in damage_levels:
+                    target_severity = 'SEVERE'
+                    damage_color = '#e74a3b'
+                    damage_status = "Critical (Severe)"
+                elif 'MODERATE' in damage_levels:
+                    target_severity = 'MODERATE'
+                    damage_color = '#fd7e14'
+                    damage_status = "Moderate Damage"
+                elif 'LIGHT' in damage_levels:
+                    target_severity = 'LIGHT'
+                    damage_color = '#f6c23e'
+                    damage_status = "Light Damage"
                 else:
-                    # Geçmiş görevleri detaylı info ile ekle
-                    history_teams.append(info)
+                    target_severity = 'NONE'
+                    damage_color = '#1cc88a'
+                    damage_status = "No Damage"
+                
+                # Bu 'hedef hasarı' (örneğin SEVERE) raporlayan en son kaydı bul
+                worst_report = reports.filter(overall_damage=target_severity).order_by('-created_at').first()
+                if worst_report:
+                    reporting_team = worst_report.assignment.team.name
 
             worksites_data.append({
                 'id': w.id,
                 'name': w.name,
                 'sector_name': w.sector.name if w.sector else "Unassigned",
                 'geometry': geom,
-                'active_teams': active_teams,
-                'history_teams': history_teams
+                'damage_color': damage_color,
+                'damage_status': damage_status,
+                'reporting_team': reporting_team  # <--- YENİ EKLENEN VERİ
             })
         except: pass
             
-    return {'sectors': sectors_data, 'worksites': worksites_data}
-
-
-def get_all_map_data():
-    """
-    Tüm Sektör ve Worksite verilerini Harita için hazırlar.
-    ÖNEMLİ DÜZELTME: json.dumps() KALDIRILDI. Doğrudan Python sözlüğü döndürüyoruz.
-    """
-    sectors_data = []
-    worksites_data = []
-
-    # 1. Sektörleri Hazırla
-    for s in Sector.objects.exclude(location_data__isnull=True).exclude(location_data=''):
-        try:
-            geom = json.loads(s.location_data) # Burada string -> dict dönüşümü yapıyoruz
-            sectors_data.append({
-                'id': s.id,
-                'name': s.name,
-                'color': s.color,
-                'geometry': geom,
-                'description': s.description
-            })
-        except:
-            pass
-
-    # 2. Worksite'ları Hazırla
-    for w in Worksite.objects.exclude(location_data__isnull=True).exclude(location_data=''):
-        try:
-            geom = json.loads(w.location_data)
-            worksites_data.append({
-                'id': w.id,
-                'name': w.name,
-                'sector_name': w.sector.name if w.sector else "Unassigned",
-                'geometry': geom
-            })
-        except:
-            pass
-            
-    # HATA BURADAYDI: return json.dumps({...}) yerine
     return {'sectors': sectors_data, 'worksites': worksites_data}
 
 # --- SECTOR VIEWS ---

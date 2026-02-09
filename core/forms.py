@@ -197,13 +197,17 @@ class WorksiteForm(forms.ModelForm):
     )
 
     class Meta:
-        model = Worksite
-        fields = ['name', 'sector', 'description', 'location_data']
-        widgets = {
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'location_data': forms.HiddenInput(), # Gizli alan
-        }
+            model = Worksite
+            fields = ['name', 'sector', 'description', 'location_data', 'status', 'completion_date'] # Yeni alanları ekledik
+            widgets = {
+                'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+                'name': forms.TextInput(attrs={'class': 'form-control'}),
+                'location_data': forms.HiddenInput(),
+                
+                # YENİ WIDGET'LAR
+                'status': forms.Select(attrs={'class': 'form-select'}),
+                'completion_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            }
 
 class AssignmentForm(forms.ModelForm):
     # Team ve Worksite için Select2 (Aramalı seçim)
